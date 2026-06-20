@@ -1,0 +1,129 @@
+{
+  "metadata": {
+    "sequence id": "09_goto_control_flow",
+    "description": "Demonstrates Label and Goto for advanced branching and retry flow.",
+    "version": "1.0.0",
+    "author": "pyqmh-sequencer"
+  },
+  "variables": {
+    "attempt": 0,
+    "max_attempts": 3,
+    "success": false,
+    "error_code": 1
+  },
+  "sequence": [
+    {
+      "ID": "start",
+      "Description": "Start label",
+      "Type": "Label"
+    },
+    {
+      "ID": "inc_attempt",
+      "Description": "Increment attempt counter",
+      "Type": "Expression",
+      "Expression": "${attempt} = ${attempt} + 1"
+    },
+    {
+      "ID": "try_operation",
+      "Description": "Mock operation using simulated success condition",
+      "Type": "If",
+      "Condition": "${attempt} >= 2",
+      "OnTrue": [
+        {
+          "ID": "set_success_true",
+          "Description": "Set success flag",
+          "Type": "Set",
+          "Variable": "success",
+          "Value": true
+        },
+        {
+          "ID": "goto_success",
+          "Description": "Jump to success path",
+          "Type": "Goto",
+          "Step": "success_path"
+        }
+      ],
+      "OnFalse": [
+        {
+          "ID": "set_error",
+          "Description": "Set retryable error code",
+          "Type": "Set",
+          "Variable": "error_code",
+          "Value": 1001
+        },
+        {
+          "ID": "goto_retry_check",
+          "Description": "Jump to retry check",
+          "Type": "Goto",
+          "Step": "retry_check"
+        }
+      ]
+    },
+    {
+      "ID": "retry_check",
+      "Description": "Retry check label",
+      "Type": "Label"
+    },
+    {
+      "ID": "if_retry",
+      "Description": "Decide to retry or fail",
+      "Type": "If",
+      "Condition": "${attempt} < ${max_attempts}",
+      "OnTrue": [
+        {
+          "ID": "report_retry",
+          "Description": "Report retry event",
+          "Type": "Report",
+          "Entry": "Attempt ${attempt} failed with error ${error_code}; retrying"
+        },
+        {
+          "ID": "goto_start",
+          "Description": "Goto start for retry",
+          "Type": "Goto",
+          "Step": "start"
+        }
+      ],
+      "OnFalse": [
+        {
+          "ID": "goto_failure",
+          "Description": "Goto failure path",
+          "Type": "Goto",
+          "Step": "failure_path"
+        }
+      ]
+    },
+    {
+      "ID": "success_path",
+      "Description": "Success label",
+      "Type": "Label"
+    },
+    {
+      "ID": "report_success",
+      "Description": "Report successful completion",
+      "Type": "Report",
+      "Entry": "Operation succeeded on attempt ${attempt}"
+    },
+    {
+      "ID": "goto_end",
+      "Description": "Jump to end",
+      "Type": "Goto",
+      "Step": "end"
+    },
+    {
+      "ID": "failure_path",
+      "Description": "Failure label",
+      "Type": "Label"
+    },
+    {
+      "ID": "report_failure",
+      "Description": "Report final failure",
+      "Type": "Report",
+      "Entry": "Operation failed after ${attempt} attempts; error ${error_code}"
+    },
+    {
+      "ID": "end",
+      "Description": "End label",
+      "Type": "Label"
+    }
+  ]
+}

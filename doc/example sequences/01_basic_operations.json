@@ -1,0 +1,65 @@
+{
+  "metadata": {
+    "sequence id": "01_basic_operations",
+    "description": "Demonstrates Set, Label, Report, Wait, and Expression step types.",
+    "version": "1.0.0",
+    "author": "pyqmh-sequencer"
+  },
+  "variables": {
+    "counter": 0,
+    "start_value": 10,
+    "fahrenheit": null,
+    "status": "INIT"
+  },
+  "sequence": [
+    {
+      "ID": "label_start",
+      "Description": "Logical start marker",
+      "Type": "Label"
+    },
+    {
+      "ID": "set_counter",
+      "Description": "Initialize counter",
+      "Type": "Set",
+      "Variable": "counter",
+      "Value": 1
+    },
+    {
+      "ID": "set_status",
+      "Description": "Set sequence status",
+      "Type": "Set",
+      "Variable": "status",
+      "Value": "Running step ${counter}"
+    },
+    {
+      "ID": "expr_convert",
+      "Description": "Compute Fahrenheit from Celsius",
+      "Type": "Expression",
+      "Expression": "${fahrenheit} = (${start_value} * 9 / 5) + 32"
+    },
+    {
+      "ID": "report_progress",
+      "Description": "Log computed values",
+      "Type": "Report",
+      "Entry": "Counter=${counter}, Start=${start_value}, Fahrenheit=${fahrenheit}, Status=${status}"
+    },
+    {
+      "ID": "wait_short",
+      "Description": "Pause briefly",
+      "Type": "Wait",
+      "Time": 0.25
+    },
+    {
+      "ID": "expr_increment",
+      "Description": "Increment counter",
+      "Type": "Expression",
+      "Expression": "${counter} = ${counter} + 1"
+    },
+    {
+      "ID": "report_complete",
+      "Description": "Log completion",
+      "Type": "Report",
+      "Entry": "Basic operations complete at counter ${counter}"
+    }
+  ]
+}

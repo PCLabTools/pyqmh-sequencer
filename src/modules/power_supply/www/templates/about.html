@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}About Power Supply{% endblock %}
+
+{% block content %}
+<div class="about-wrap">
+    <div class="about-card">
+        <h1>Power Supply Module</h1>
+        <p>
+            This module simulates a single-channel bench power supply and exposes message-driven control
+            commands through the protocol. It is intended to support sequence examples that configure
+            setpoints, enable output, and read live telemetry.
+        </p>
+        <p>
+            Supported API commands: <strong>configure_output</strong> (voltage, current_limit),
+            <strong>enable_output</strong> (enabled), <strong>set_load</strong> (load_resistance), and
+            <strong>read_output</strong> (status response). The simulation tracks setpoints and computes
+            measured voltage, current, and power with current-limit behavior.
+        </p>
+    </div>
+</div>
+{% endblock %}

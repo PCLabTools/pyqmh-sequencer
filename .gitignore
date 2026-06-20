@@ -1,0 +1,29 @@
+.venv
+__pycache__/
+*.egg-info
+.pytest_cache/
+.coverage
+
+# Packaging/build outputs
+build/
+dist/
+*.egg
+pip-wheel-metadata/
+
+# Coverage outputs
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Type/lint/test tooling caches
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# Optional local Python version file
+.python-version

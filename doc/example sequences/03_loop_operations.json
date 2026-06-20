@@ -1,0 +1,103 @@
+{
+  "metadata": {
+    "sequence id": "03_loop_operations",
+    "description": "Demonstrates For, For Each, While, iterator variables, and Break usage.",
+    "version": "1.0.0",
+    "author": "pyqmh-sequencer"
+  },
+  "variables": {
+    "sum": 0,
+    "for_index": 0,
+    "while_index": 0,
+    "item_index": 0,
+    "current_item": null,
+    "items": [3, 5, 7, 9],
+    "countdown": 4
+  },
+  "sequence": [
+    {
+      "ID": "for_loop",
+      "Description": "Run fixed loop and accumulate index",
+      "Type": "For",
+      "Iterations": 5,
+      "Index": "for_index",
+      "SubSequence": [
+        {
+          "ID": "for_sum",
+          "Description": "Add index to sum",
+          "Type": "Expression",
+          "Expression": "${sum} = ${sum} + ${for_index}"
+        },
+        {
+          "ID": "for_report",
+          "Description": "Report for progress",
+          "Type": "Report",
+          "Entry": "For index=${for_index}, sum=${sum}"
+        }
+      ]
+    },
+    {
+      "ID": "while_loop",
+      "Description": "Use while with explicit counter and conditional break",
+      "Type": "While",
+      "Condition": "${countdown} <= 0",
+      "Index": "while_index",
+      "SubSequence": [
+        {
+          "ID": "while_report",
+          "Description": "Report while countdown",
+          "Type": "Report",
+          "Entry": "While index=${while_index}, countdown=${countdown}"
+        },
+        {
+          "ID": "while_dec",
+          "Description": "Decrement countdown",
+          "Type": "Expression",
+          "Expression": "${countdown} = ${countdown} - 1"
+        },
+        {
+          "ID": "while_break_if",
+          "Description": "Break when countdown equals 2",
+          "Type": "If",
+          "Condition": "${countdown} == 2",
+          "OnTrue": [
+            {
+              "ID": "while_break",
+              "Description": "Break out of while loop",
+              "Type": "Break"
+            }
+          ],
+          "OnFalse": []
+        }
+      ]
+    },
+    {
+      "ID": "for_each_loop",
+      "Description": "Iterate through array values",
+      "Type": "For Each",
+      "Array": "${items}",
+      "Element": "current_item",
+      "Index": "item_index",
+      "SubSequence": [
+        {
+          "ID": "for_each_sum",
+          "Description": "Accumulate item values",
+          "Type": "Expression",
+          "Expression": "${sum} = ${sum} + ${current_item}"
+        },
+        {
+          "ID": "for_each_report",
+          "Description": "Report for-each progress",
+          "Type": "Report",
+          "Entry": "ForEach index=${item_index}, item=${current_item}, sum=${sum}"
+        }
+      ]
+    },
+    {
+      "ID": "final_report",
+      "Description": "Report loop summary",
+      "Type": "Report",
+      "Entry": "Loop operations complete with final sum=${sum}"
+    }
+  ]
+}

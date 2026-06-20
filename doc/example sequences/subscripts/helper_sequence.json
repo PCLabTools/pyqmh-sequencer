@@ -1,0 +1,26 @@
+{
+  "metadata": {
+    "sequence id": "helper_sequence",
+    "description": "Inline helper sequence used by 07_sequence_calls.json.",
+    "version": "1.0.0",
+    "author": "pyqmh-sequencer"
+  },
+  "variables": {
+    "input_value": 0,
+    "output_value": 0
+  },
+  "sequence": [
+    {
+      "ID": "compute_output",
+      "Description": "Compute helper output from input",
+      "Type": "Expression",
+      "Expression": "${output_value} = (${input_value} * 2) + 1"
+    },
+    {
+      "ID": "report_output",
+      "Description": "Report helper computation",
+      "Type": "Report",
+      "Entry": "Helper sequence transformed ${input_value} to ${output_value}"
+    }
+  ]
+}

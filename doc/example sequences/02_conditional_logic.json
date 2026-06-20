@@ -1,0 +1,114 @@
+{
+  "metadata": {
+    "sequence id": "02_conditional_logic",
+    "description": "Demonstrates If, While, Do While, and Break control flow.",
+    "version": "1.0.0",
+    "author": "pyqmh-sequencer"
+  },
+  "variables": {
+    "value": 0,
+    "while_index": 0,
+    "dowhile_index": 0,
+    "mode": "normal"
+  },
+  "sequence": [
+    {
+      "ID": "if_branch",
+      "Description": "Branch based on mode",
+      "Type": "If",
+      "Condition": "${mode} == 'normal'",
+      "OnTrue": [
+        {
+          "ID": "if_true_report",
+          "Description": "True branch report",
+          "Type": "Report",
+          "Entry": "Mode is normal, executing normal path"
+        },
+        {
+          "ID": "if_true_set",
+          "Description": "Set initial value for normal mode",
+          "Type": "Set",
+          "Variable": "value",
+          "Value": 2
+        }
+      ],
+      "OnFalse": [
+        {
+          "ID": "if_false_report",
+          "Description": "False branch report",
+          "Type": "Report",
+          "Entry": "Mode is not normal, executing alternate path"
+        },
+        {
+          "ID": "if_false_set",
+          "Description": "Set initial value for alternate mode",
+          "Type": "Set",
+          "Variable": "value",
+          "Value": 10
+        }
+      ]
+    },
+    {
+      "ID": "while_loop",
+      "Description": "Increment value until threshold with optional break",
+      "Type": "While",
+      "Condition": "${value} >= 6",
+      "Index": "while_index",
+      "SubSequence": [
+        {
+          "ID": "while_report",
+          "Description": "Report current while values",
+          "Type": "Report",
+          "Entry": "While iteration=${while_index}, value=${value}"
+        },
+        {
+          "ID": "while_add",
+          "Description": "Increment value in while loop",
+          "Type": "Expression",
+          "Expression": "${value} = ${value} + 1"
+        },
+        {
+          "ID": "while_break_if",
+          "Description": "Break if value reached emergency stop",
+          "Type": "If",
+          "Condition": "${value} == 5",
+          "OnTrue": [
+            {
+              "ID": "while_break",
+              "Description": "Exit while loop early",
+              "Type": "Break"
+            }
+          ],
+          "OnFalse": []
+        }
+      ]
+    },
+    {
+      "ID": "dowhile_loop",
+      "Description": "Do While executes at least once then checks condition",
+      "Type": "Do While",
+      "Condition": "${dowhile_index} >= 3",
+      "Index": "dowhile_index",
+      "SubSequence": [
+        {
+          "ID": "dowhile_report",
+          "Description": "Report do-while iteration",
+          "Type": "Report",
+          "Entry": "DoWhile index=${dowhile_index}, value=${value}"
+        },
+        {
+          "ID": "dowhile_add",
+          "Description": "Adjust value each do-while iteration",
+          "Type": "Expression",
+          "Expression": "${value} = ${value} + 2"
+        }
+      ]
+    },
+    {
+      "ID": "final_report",
+      "Description": "Report final result",
+      "Type": "Report",
+      "Entry": "Conditional logic complete with value=${value}, while_index=${while_index}, dowhile_index=${dowhile_index}"
+    }
+  ]
+}

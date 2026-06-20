@@ -1,0 +1,233 @@
+{
+  "metadata": {
+    "sequence id": "08_comprehensive_test",
+    "description": "Comprehensive sequence combining prompts, requests, loops, reporting, and cleanup.",
+    "version": "1.0.0",
+    "author": "pyqmh-sequencer"
+  },
+  "variables": {
+    "operator": "",
+    "start_test": false,
+    "attempt": 0,
+    "max_attempts": 3,
+    "measurement": 0.0,
+    "measurement_sum": 0.0,
+    "measurement_count": 5,
+    "measurement_index": 0,
+    "test_passed": false,
+    "status": "idle"
+  },
+  "sequence": [
+    {
+      "ID": "prompt_operator",
+      "Description": "Collect operator name",
+      "Type": "Prompt",
+      "Title": "Operator",
+      "Message": "Enter operator name for this run",
+      "PromptType": "STRING",
+      "Return": "operator"
+    },
+    {
+      "ID": "prompt_start",
+      "Description": "Confirm starting the test",
+      "Type": "Prompt",
+      "Title": "Start Test",
+      "Message": "Start comprehensive test sequence now?",
+      "PromptType": "OK/CANCEL",
+      "Return": "start_test"
+    },
+    {
+      "ID": "if_start",
+      "Description": "Branch based on start confirmation",
+      "Type": "If",
+      "Condition": "${start_test}",
+      "OnTrue": [
+        {
+          "ID": "set_running",
+          "Description": "Set running status",
+          "Type": "Set",
+          "Variable": "status",
+          "Value": "running"
+        },
+        {
+          "ID": "report_start",
+          "Description": "Report sequence start",
+          "Type": "Report",
+          "Entry": "Comprehensive test started by ${operator}"
+        }
+      ],
+      "OnFalse": [
+        {
+          "ID": "report_cancel",
+          "Description": "Report canceled start",
+          "Type": "Report",
+          "Entry": "Operator canceled test start"
+        },
+        {
+          "ID": "set_canceled",
+          "Description": "Update status to canceled",
+          "Type": "Set",
+          "Variable": "status",
+          "Value": "canceled"
+        },
+        {
+          "ID": "stop_if_canceled",
+          "Description": "Jump to cleanup",
+          "Type": "Goto",
+          "Step": "cleanup"
+        }
+      ]
+    },
+    {
+      "ID": "retry_measure",
+      "Description": "Retry module request until success or max attempts",
+      "Type": "While",
+      "Condition": "${attempt} >= ${max_attempts} or ${test_passed}",
+      "SubSequence": [
+        {
+          "ID": "inc_attempt",
+          "Description": "Increment retry counter",
+          "Type": "Expression",
+          "Expression": "${attempt} = ${attempt} + 1"
+        },
+        {
+          "ID": "request_measure",
+          "Description": "Request one measurement",
+          "Type": "Request",
+          "Module ID": "power_meter",
+          "Action": "measure",
+          "Arguments": {
+            "channel": 1
+          },
+          "Return": {
+            "voltage": "measurement"
+          },
+          "Timeout": 1000,
+          "OnTimeout": [
+            {
+              "ID": "timeout_report",
+              "Description": "Report timeout",
+              "Type": "Report",
+              "Entry": "Attempt ${attempt}: request timeout"
+            }
+          ]
+        },
+        {
+          "ID": "validate_measurement",
+          "Description": "Check if measurement is acceptable",
+          "Type": "If",
+          "Condition": "${measurement} >= 4.5 and ${measurement} <= 5.5",
+          "OnTrue": [
+            {
+              "ID": "set_passed",
+              "Description": "Mark request as passed",
+              "Type": "Set",
+              "Variable": "test_passed",
+              "Value": true
+            },
+            {
+              "ID": "report_attempt_pass",
+              "Description": "Report retry success",
+              "Type": "Report",
+              "Entry": "Attempt ${attempt}: measurement ${measurement} accepted"
+            }
+          ],
+          "OnFalse": [
+            {
+              "ID": "report_attempt_fail",
+              "Description": "Report retry failure",
+              "Type": "Report",
+              "Entry": "Attempt ${attempt}: measurement ${measurement} outside range"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ID": "if_retry_outcome",
+      "Description": "Determine whether to continue to measurement loop",
+      "Type": "If",
+      "Condition": "${test_passed}",
+      "OnTrue": [
+        {
+          "ID": "measure_loop",
+          "Description": "Collect several measurements",
+          "Type": "For",
+          "Iterations": "${measurement_count}",
+          "Index": "measurement_index",
+          "SubSequence": [
+            {
+              "ID": "loop_request",
+              "Description": "Request measurement sample",
+              "Type": "Request",
+              "Module ID": "power_meter",
+              "Action": "measure",
+              "Arguments": {
+                "channel": 1
+              },
+              "Return": {
+                "voltage": "measurement"
+              }
+            },
+            {
+              "ID": "loop_accumulate",
+              "Description": "Accumulate samples",
+              "Type": "Expression",
+              "Expression": "${measurement_sum} = ${measurement_sum} + ${measurement}"
+            },
+            {
+              "ID": "loop_report",
+              "Description": "Report sample",
+              "Type": "Report",
+              "Entry": "Sample ${measurement_index}: ${measurement}"
+            }
+          ]
+        },
+        {
+          "ID": "report_result_pass",
+          "Description": "Write pass result",
+          "Type": "Report Result",
+          "Test": "Comprehensive test",
+          "Result": "PASS"
+        }
+      ],
+      "OnFalse": [
+        {
+          "ID": "report_result_fail",
+          "Description": "Write fail result",
+          "Type": "Report Result",
+          "Test": "Comprehensive test",
+          "Result": "FAIL"
+        }
+      ]
+    },
+    {
+      "ID": "cleanup",
+      "Description": "Cleanup label and shutdown actions",
+      "Type": "Label"
+    },
+    {
+      "ID": "disable_supply",
+      "Description": "Disable power supply at end of test",
+      "Type": "Action",
+      "Module ID": "power_supply",
+      "Action": "enable_output",
+      "Arguments": {
+        "enabled": false
+      }
+    },
+    {
+      "ID": "final_status",
+      "Description": "Set final status",
+      "Type": "Set",
+      "Variable": "status",
+      "Value": "complete"
+    },
+    {
+      "ID": "final_report",
+      "Description": "Report final summary",
+      "Type": "Report",
+      "Entry": "Comprehensive test complete. passed=${test_passed}, attempts=${attempt}, sum=${measurement_sum}"
+    }
+  ]
+}

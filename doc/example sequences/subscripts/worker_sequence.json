@@ -1,0 +1,50 @@
+{
+  "metadata": {
+    "sequence id": "worker_sequence",
+    "description": "Threaded helper sequence used by 07_sequence_calls.json.",
+    "version": "1.0.0",
+    "author": "pyqmh-sequencer"
+  },
+  "variables": {
+    "iterations": 1,
+    "status": "starting",
+    "loop_index": 0
+  },
+  "sequence": [
+    {
+      "ID": "set_running",
+      "Description": "Update worker status to running",
+      "Type": "Set",
+      "Variable": "status",
+      "Value": "running"
+    },
+    {
+      "ID": "worker_loop",
+      "Description": "Perform threaded worker loop",
+      "Type": "For",
+      "Iterations": "${iterations}",
+      "Index": "loop_index",
+      "SubSequence": [
+        {
+          "ID": "worker_report",
+          "Description": "Report worker iteration",
+          "Type": "Report",
+          "Entry": "Worker iteration ${loop_index}"
+        },
+        {
+          "ID": "worker_wait",
+          "Description": "Simulate work duration",
+          "Type": "Wait",
+          "Time": 0.2
+        }
+      ]
+    },
+    {
+      "ID": "set_done",
+      "Description": "Set worker status complete",
+      "Type": "Set",
+      "Variable": "status",
+      "Value": "complete"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "metadata": {
+    "sequence id": "07_sequence_calls",
+    "description": "Demonstrates Call step for inline and threaded sequence execution.",
+    "version": "1.0.0",
+    "author": "pyqmh-sequencer"
+  },
+  "variables": {
+    "base_value": 4,
+    "helper_result": 0,
+    "worker_iterations": 3,
+    "worker_status": "not started"
+  },
+  "sequence": [
+    {
+      "ID": "call_inline_helper",
+      "Description": "Call helper sequence inline and wait for completion",
+      "Type": "Call",
+      "Sequence": "subscripts/helper_sequence.json",
+      "Threaded": false,
+      "Arguments": {
+        "input_value": "${base_value}",
+        "output_value": "${helper_result}"
+      }
+    },
+    {
+      "ID": "report_helper",
+      "Description": "Report helper result",
+      "Type": "Report",
+      "Entry": "Inline helper updated helper_result=${helper_result}"
+    },
+    {
+      "ID": "call_threaded_worker",
+      "Description": "Start worker sequence in a new thread",
+      "Type": "Call",
+      "Sequence": "subscripts/worker_sequence.json",
+      "Threaded": true,
+      "Arguments": {
+        "iterations": "${worker_iterations}",
+        "status": "${worker_status}"
+      }
+    },
+    {
+      "ID": "wait_for_worker",
+      "Description": "Allow worker thread time to complete",
+      "Type": "Wait",
+      "Time": 1.0
+    },
+    {
+      "ID": "report_worker",
+      "Description": "Report worker completion state",
+      "Type": "Report",
+      "Entry": "Threaded worker status=${worker_status}"
+    }
+  ]
+}

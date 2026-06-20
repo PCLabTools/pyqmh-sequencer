@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Power Meter{% endblock %}</title>
+    <script>
+        (function () {
+            try {
+                var options = ['light', 'dark', 'system'];
+                var mode = null;
+                if (window.self !== window.top) {
+                    try {
+                        var parentMode = window.parent.document.documentElement.getAttribute('data-theme-mode');
+                        if (options.indexOf(parentMode) !== -1) {
+                            mode = parentMode;
+                        }
+                    } catch (_) {
+                        mode = null;
+                    }
+                }
+                if (!mode) {
+                    var storedMode = localStorage.getItem('pyqmh-theme');
+                    mode = options.indexOf(storedMode) !== -1 ? storedMode : 'system';
+                }
+                var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                var resolved = mode === 'system' ? (dark ? 'dark' : 'light') : mode;
+                document.documentElement.setAttribute('data-theme', resolved);
+                document.documentElement.setAttribute('data-theme-mode', mode);
+            } catch (_) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.documentElement.setAttribute('data-theme-mode', 'system');
+            }
+        })();
+    </script>
+    <link rel="stylesheet" href="{{ module_base_path }}/static/css/style.css">
+    {% block head_extra %}{% endblock %}
+</head>
+<body class="{% if not show_nav %}no-nav{% endif %}">
+    {% if show_nav %}
+    <nav id="main-nav">
+        <div class="nav-header">
+            <a href="{{ module_base_path or '/' }}" class="nav-brand">{{ module_name | replace('_', ' ') | title }}</a>
+        </div>
+        <ul class="nav-links">
+            {% for item in nav_items %}
+                {% if item.type == "link" %}
+                <li>
+                    <a href="{{ item.path }}" class="nav-link{% if item.active %} active{% endif %}">{{ item.label }}</a>
+                </li>
+                {% elif item.type == "dropdown" and item["items"] %}
+                <li class="nav-item-dropdown">
+                    <span class="nav-link nav-dropdown-trigger{% if item.active %} active{% endif %}">
+                        {{ item.label }}
+                        <svg class="dropdown-caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </span>
+                    <ul class="nav-dropdown">
+                        {% for sub_item in item["items"] %}
+                        <li>
+                            <a href="{{ sub_item.path }}" class="nav-dropdown-link{% if sub_item.active %} active{% endif %}">
+                                {{ sub_item.label }}
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+        <div class="theme-controls" aria-label="Theme controls">
+            <button type="button" class="theme-button" data-theme-option="light" title="Light theme" aria-label="Light theme">☀</button>
+            <button type="button" class="theme-button" data-theme-option="dark" title="Dark theme" aria-label="Dark theme">☾</button>
+            <button type="button" class="theme-button" data-theme-option="system" title="System theme" aria-label="System theme">◐</button>
+        </div>
+    </nav>
+    {% endif %}
+    <main id="main-content">
+        {% block content %}{% endblock %}
+    </main>
+    <script src="{{ module_base_path }}/static/js/theme.js"></script>
+    {% block scripts_extra %}{% endblock %}
+</body>
+</html>

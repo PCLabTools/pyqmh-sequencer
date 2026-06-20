@@ -1,0 +1,97 @@
+{
+  "metadata": {
+    "sequence id": "04_module_communication",
+    "description": "Demonstrates Action and Request step types with timeout handling.",
+    "version": "1.0.0",
+    "author": "pyqmh-sequencer"
+  },
+  "variables": {
+    "target_voltage": 5.0,
+    "target_current": 0.5,
+    "measured_voltage": null,
+    "measured_current": null,
+    "request_ok": false
+  },
+  "sequence": [
+    {
+      "ID": "ps_enable",
+      "Description": "Send action to configure power supply",
+      "Type": "Action",
+      "Module ID": "power_supply",
+      "Action": "configure_output",
+      "Arguments": {
+        "voltage": "${target_voltage}",
+        "current_limit": "${target_current}"
+      }
+    },
+    {
+      "ID": "ps_on",
+      "Description": "Enable output using action",
+      "Type": "Action",
+      "Module ID": "power_supply",
+      "Action": "enable_output",
+      "Arguments": {
+        "enabled": true
+      }
+    },
+    {
+      "ID": "meter_request",
+      "Description": "Request measurement from power meter",
+      "Type": "Request",
+      "Module ID": "power_meter",
+      "Action": "measure",
+      "Arguments": {
+        "channel": 1
+      },
+      "Return": {
+        "voltage": "measured_voltage",
+        "current": "measured_current"
+      },
+      "Timeout": 1000,
+      "OnTimeout": [
+        {
+          "ID": "timeout_report",
+          "Description": "Report timeout condition",
+          "Type": "Report",
+          "Entry": "Request timeout while waiting for power meter response"
+        },
+        {
+          "ID": "timeout_set",
+          "Description": "Flag failed request",
+          "Type": "Set",
+          "Variable": "request_ok",
+          "Value": false
+        }
+      ]
+    },
+    {
+      "ID": "request_eval",
+      "Description": "Evaluate whether returned data is valid",
+      "Type": "If",
+      "Condition": "${measured_voltage} != null",
+      "OnTrue": [
+        {
+          "ID": "request_ok_set",
+          "Description": "Set request success",
+          "Type": "Set",
+          "Variable": "request_ok",
+          "Value": true
+        },
+        {
+          "ID": "request_ok_report",
+          "Description": "Report request success",
+          "Type": "Report",
+          "Entry": "Measurement received: V=${measured_voltage}, I=${measured_current}"
+        }
+      ],
+      "OnFalse": [
+        {
+          "ID": "request_fail_report",
+          "Description": "Report request failure",
+          "Type": "Report",
+          "Entry": "Measurement response missing or invalid"
+        }
+      ]
+    }
+  ]
+}

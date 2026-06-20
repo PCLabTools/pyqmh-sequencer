@@ -1,0 +1,82 @@
+{
+  "metadata": {
+    "sequence id": "05_user_interaction",
+    "description": "Demonstrates Prompt step type for CONFIRM, OK/CANCEL, STRING, and NUMBER.",
+    "version": "1.0.0",
+    "author": "pyqmh-sequencer"
+  },
+  "variables": {
+    "confirm_ack": null,
+    "continue_test": false,
+    "operator_name": "",
+    "target_count": 0,
+    "validated": false
+  },
+  "sequence": [
+    {
+      "ID": "prompt_confirm",
+      "Description": "Display confirm prompt",
+      "Type": "Prompt",
+      "Title": "Sequence Example",
+      "Message": "This sequence demonstrates user prompts.",
+      "PromptType": "CONFIRM",
+      "Return": "confirm_ack"
+    },
+    {
+      "ID": "prompt_ok_cancel",
+      "Description": "Ask user to continue",
+      "Type": "Prompt",
+      "Title": "Continue?",
+      "Message": "Continue to data entry prompts?",
+      "PromptType": "OK/CANCEL",
+      "Return": "continue_test"
+    },
+    {
+      "ID": "prompt_string",
+      "Description": "Collect operator name",
+      "Type": "Prompt",
+      "Title": "Operator",
+      "Message": "Enter operator name",
+      "PromptType": "STRING",
+      "Return": "operator_name"
+    },
+    {
+      "ID": "prompt_number",
+      "Description": "Collect numeric target",
+      "Type": "Prompt",
+      "Title": "Target Count",
+      "Message": "Enter a target count between 1 and 10",
+      "PromptType": "NUMBER",
+      "Return": "target_count"
+    },
+    {
+      "ID": "validate_inputs",
+      "Description": "Validate prompt responses",
+      "Type": "If",
+      "Condition": "${continue_test} and ${operator_name} != '' and ${target_count} >= 1 and ${target_count} <= 10",
+      "OnTrue": [
+        {
+          "ID": "set_valid",
+          "Description": "Flag valid input",
+          "Type": "Set",
+          "Variable": "validated",
+          "Value": true
+        },
+        {
+          "ID": "report_valid",
+          "Description": "Report valid inputs",
+          "Type": "Report",
+          "Entry": "Inputs valid for operator ${operator_name}, target_count=${target_count}"
+        }
+      ],
+      "OnFalse": [
+        {
+          "ID": "report_invalid",
+          "Description": "Report invalid inputs",
+          "Type": "Report",
+          "Entry": "Inputs were invalid or user canceled"
+        }
+      ]
+    }
+  ]
+}

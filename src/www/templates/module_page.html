@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}pyqmh — {{ module_name | replace('_', ' ') | title }}{% endblock %}
+
+{% block content %}
+<iframe
+    id="module-frame"
+    src="/module/{{ module_name }}/app/"
+    title="{{ module_name | replace('_', ' ') | title }}"
+    allowfullscreen>
+</iframe>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}About Power Meter{% endblock %}
+
+{% block content %}
+<div class="about-wrap">
+    <div class="about-card">
+        <h1>Power Meter Module</h1>
+        <p>
+            This module simulates a power meter that serves voltage, current, and power measurements for
+            sequence-driven tests. It is designed to operate through protocol messages and remain decoupled
+            from direct module-to-module method calls.
+        </p>
+        <p>
+            Supported API commands: <strong>measure</strong> (channel), <strong>set_noise</strong>
+            (noise_percent), and <strong>read_status</strong> (current settings and last measurement).
+            The simulation samples the power_supply readback and applies configurable noise to emulate
+            realistic measurement variation.
+        </p>
+    </div>
+</div>
+{% endblock %}

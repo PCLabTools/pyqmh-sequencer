@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}pyqmh — About{% endblock %}
+
+{% block content %}
+<div class="about">
+    <div class="about-inner">
+
+        <div class="about-hero">
+            <span class="about-badge">Architecture</span>
+            <h1 class="about-title">Python Queued<br><span>Message Handler</span></h1>
+            <p class="about-subtitle">A modular, message-driven application framework for Python.</p>
+        </div>
+
+        <div class="about-cards">
+            <div class="about-card">
+                <div class="about-card-icon">&#9648;</div>
+                <h3>Protocol</h3>
+                <p>A central message bus that routes commands between modules by address — no direct calls between modules.</p>
+            </div>
+            <div class="about-card">
+                <div class="about-card-icon">&#9635;</div>
+                <h3>Modules</h3>
+                <p>Self-contained units of behaviour, each owning its state and running in its own execution loop.</p>
+            </div>
+            <div class="about-card">
+                <div class="about-card-icon">&#8644;</div>
+                <h3>Queue-Based</h3>
+                <p>Messages are delivered asynchronously through a queue, keeping modules fully decoupled from each other.</p>
+            </div>
+            <div class="about-card">
+                <div class="about-card-icon">&#10070;</div>
+                <h3>Web-Ready</h3>
+                <p>Each module can expose its own Flask application, served in an iframe from this central navigation shell.</p>
+            </div>
+        </div>
+
+        <div class="about-section">
+            <h2>How it works</h2>
+            <p>
+                The main application creates a <strong>Protocol</strong> instance, registers one or more
+                <strong>Modules</strong>, then enters a message loop. Cross-module coordination happens
+                exclusively through <code>protocol.send_action()</code> — never by direct method calls.
+            </p>
+            <div class="about-flow">
+                <span class="flow-step">app.py</span>
+                <span class="flow-arrow">&#8594;</span>
+                <span class="flow-step">Protocol</span>
+                <span class="flow-arrow">&#8594;</span>
+                <span class="flow-step">Message Queue</span>
+                <span class="flow-arrow">&#8594;</span>
+                <span class="flow-step">Module A</span>
+                <span class="flow-arrow">&#8594;</span>
+                <span class="flow-step">Module B …</span>
+            </div>
+        </div>
+
+        <div class="about-section">
+            <h2>Module types</h2>
+            <p>
+                <strong>Standard modules</strong> extend the base Module class directly and contain all
+                concrete runtime behaviour in one class — ideal for logging, UI integrations, and
+                one-off coordination logic.<br><br>
+                <strong>Factory modules</strong> define an abstract base class and expose multiple
+                interchangeable implementations (e.g. simulated vs. real hardware). The factory pattern
+                keeps the abstraction boundary clean and avoids condition-heavy code throughout the app.
+            </p>
+        </div>
+
+        {% if modules %}
+        <div class="about-section">
+            <h2>Active modules</h2>
+            <p>The following modules were discovered at startup and are available from the navigation bar:</p>
+            <ul class="about-modules-list">
+                {% for module in modules %}
+                <li>
+                    <a href="{% if module in modules_with_about %}/module/{{ module }}/app/about{% else %}/module/{{ module }}{% endif %}">
+                        {{ module | replace('_', ' ') | title }}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <div class="about-footer">
+            Running on <strong>pyqmh</strong> &mdash; Python Queued Message Handler &mdash; served by Flask.
+        </div>
+
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{
+  "metadata": {
+    "sequence id": "test_suite",
+    "description": "Calls all example sequences inline in order.",
+    "version": "1.0.0",
+    "author": "pyqmh-sequencer"
+  },
+  "variables": {},
+  "sequence": [
+    {
+      "ID": "call_01",
+      "Description": "Run basic operations example",
+      "Type": "Call",
+      "Sequence": "01_basic_operations.json",
+      "Threaded": false
+    },
+    {
+      "ID": "call_02",
+      "Description": "Run conditional logic example",
+      "Type": "Call",
+      "Sequence": "02_conditional_logic.json",
+      "Threaded": false
+    },
+    {
+      "ID": "call_03",
+      "Description": "Run loop operations example",
+      "Type": "Call",
+      "Sequence": "03_loop_operations.json",
+      "Threaded": false
+    },
+    {
+      "ID": "call_04",
+      "Description": "Run module communication example",
+      "Type": "Call",
+      "Sequence": "04_module_communication.json",
+      "Threaded": false
+    },
+    {
+      "ID": "call_05",
+      "Description": "Run user interaction example",
+      "Type": "Call",
+      "Sequence": "05_user_interaction.json",
+      "Threaded": false
+    },
+    {
+      "ID": "call_06",
+      "Description": "Run system commands example",
+      "Type": "Call",
+      "Sequence": "06_system_commands.json",
+      "Threaded": false
+    },
+    {
+      "ID": "call_07",
+      "Description": "Run sequence calls example",
+      "Type": "Call",
+      "Sequence": "07_sequence_calls.json",
+      "Threaded": false
+    },
+    {
+      "ID": "call_08",
+      "Description": "Run comprehensive test example",
+      "Type": "Call",
+      "Sequence": "08_comprehensive_test.json",
+      "Threaded": false
+    },
+    {
+      "ID": "call_09",
+      "Description": "Run goto control flow example",
+      "Type": "Call",
+      "Sequence": "09_goto_control_flow.json",
+      "Threaded": false
+    },
+    {
+      "ID": "suite_complete",
+      "Description": "Report test suite completion",
+      "Type": "Report",
+      "Entry": "All example sequences were called inline"
+    }
+  ]
+}

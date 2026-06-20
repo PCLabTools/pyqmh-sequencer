@@ -1,0 +1,66 @@
+{
+  "metadata": {
+    "sequence id": "06_system_commands",
+    "description": "Demonstrates CLI command execution and result handling.",
+    "version": "1.0.0",
+    "author": "pyqmh-sequencer"
+  },
+  "variables": {
+    "dir_output": "",
+    "date_output": "",
+    "path_exists_output": "",
+    "path_check_ok": false
+  },
+  "sequence": [
+    {
+      "ID": "cli_dir",
+      "Description": "Run directory listing",
+      "Type": "CLI",
+      "Command": "dir",
+      "Return": "dir_output"
+    },
+    {
+      "ID": "cli_date",
+      "Description": "Run PowerShell date command",
+      "Type": "CLI",
+      "Command": "powershell -NoProfile -Command \"Get-Date -Format o\"",
+      "Return": "date_output"
+    },
+    {
+      "ID": "cli_check_path",
+      "Description": "Check if the doc folder exists",
+      "Type": "CLI",
+      "Command": "powershell -NoProfile -Command \"Test-Path .\\doc\"",
+      "Return": "path_exists_output"
+    },
+    {
+      "ID": "evaluate_path",
+      "Description": "Conditionally evaluate command result",
+      "Type": "If",
+      "Condition": "'True' in str(${path_exists_output})",
+      "OnTrue": [
+        {
+          "ID": "set_path_ok",
+          "Description": "Set successful path check",
+          "Type": "Set",
+          "Variable": "path_check_ok",
+          "Value": true
+        },
+        {
+          "ID": "report_cmd_ok",
+          "Description": "Report command outputs",
+          "Type": "Report",
+          "Entry": "CLI complete. date=${date_output}"
+        }
+      ],
+      "OnFalse": [
+        {
+          "ID": "report_cmd_fail",
+          "Description": "Report path check failure",
+          "Type": "Report",
+          "Entry": "CLI path check failed: ${path_exists_output}"
+        }
+      ]
+    }
+  ]
+}

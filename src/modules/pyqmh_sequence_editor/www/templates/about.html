@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}About Hello World{% endblock %}
+
+{% block content %}
+<div class="about-wrap">
+    <div class="about-card">
+        <h1>Hello World Module</h1>
+        <p>
+            This module runs on the pyqmh architecture, where module behavior is isolated and coordination
+            happens through protocol messages rather than direct cross-module calls.
+        </p>
+        <p>
+            When this module is loaded in an iframe from the main app, it switches to sub-module navigation
+            only. When run directly, it shows Home, About, and any nested modules discovered in a local
+            modules folder.
+        </p>
+    </div>
+</div>
+{% endblock %}
