@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Hello World{% endblock %}</title>
+    <title>{% block title %}Sequence Editor{% endblock %}</title>
     <script>
         (function () {
             try {
@@ -38,9 +38,9 @@
 </head>
 <body class="{% if not show_nav %}no-nav{% endif %}">
     {% if show_nav %}
-    <nav id="main-nav">
+    <nav id="main-nav" aria-label="Main navigation">
         <div class="nav-header">
-            <a href="{{ module_base_path or '/' }}" class="nav-brand">hello world</a>
+            <a href="{{ module_base_path or '/' }}" class="nav-brand">sequence editor</a>
         </div>
         <ul class="nav-links">
             {% for item in nav_items %}
@@ -78,5 +78,6 @@
         {% block content %}{% endblock %}
     </main>
     <script src="{{ module_base_path }}/static/js/theme.js"></script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>

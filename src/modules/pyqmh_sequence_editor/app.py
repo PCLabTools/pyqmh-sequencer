@@ -19,7 +19,12 @@ class App():
         self.logger.setLevel(logging.DEBUG if self.debug else logging.INFO)
 
         # Register modules here
-        PyqmhSequenceEditor("hello_world", self.protocol, debug=self.debug)
+        PyqmhSequenceEditor(
+            "pyqmh_sequence_editor",
+            self.protocol,
+            debug=self.debug,
+            default_sequence_dir="doc/example sequences",
+        )
 
         self._web_gui = ModuleWebGui(
             logger=self.logger,

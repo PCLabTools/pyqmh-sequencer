@@ -23,7 +23,12 @@ class App():
         # Register modules here
         PowerMeter("power_meter", self.protocol, debug=self.debug)
         PowerSupply("power_supply", self.protocol, debug=self.debug)
-        PyqmhSequenceEditor("pyqmh_sequence_editor", self.protocol, debug=self.debug)
+        PyqmhSequenceEditor(
+            "pyqmh_sequence_editor",
+            self.protocol,
+            debug=self.debug,
+            default_sequence_dir="doc/example sequences",
+        )
         # Example("ExampleModule", self.protocol, debug=self.debug)
 
         self._web_gui = WebGui(logger=self.logger, protocol=self.protocol)

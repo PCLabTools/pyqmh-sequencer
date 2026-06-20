@@ -30,24 +30,69 @@
 
 {% extends "base.html" %}
 
-{% block title %}Hello World{% endblock %}
+{% block title %}pyqmh Sequence Editor{% endblock %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+{% endblock %}
 
 {% block content %}
-    <div class="container">
-        <pre class="ascii-art">
- ██╗  ██╗███████╗██╗     ██╗      ██████╗
- ██║  ██║██╔════╝██║     ██║     ██╔═══██╗
- ███████║█████╗  ██║     ██║     ██║   ██║
- ██╔══██║██╔══╝  ██║     ██║     ██║   ██║
- ██║  ██║███████╗███████╗███████╗╚██████╔╝
- ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝ ╚═════╝
+<div class="editor-shell" data-module-base="{{ module_base_path }}">
+    <header class="editor-toolbar">
+        <div class="toolbar-title-wrap">
+            <h1>Sequence Editor</h1>
+            <p id="status-text">Ready</p>
+            <p id="sequence-dir-indicator" class="sequence-dir-indicator">Folder: doc/example sequences</p>
+        </div>
+        <div class="toolbar-actions">
+            <button id="btn-browse-sequence-dir" type="button">Browse...</button>
+            <button id="btn-refresh" type="button">Refresh Files</button>
+            <select id="file-select" aria-label="Sequence file list"></select>
+            <button id="btn-new" type="button">New</button>
+            <button id="btn-load" type="button">Load</button>
+            <button id="btn-save" type="button">Save</button>
+            <input id="save-path" type="text" placeholder="doc/example sequences/my_sequence.json" aria-label="Save path">
+            <button id="btn-save-as" type="button">Save As</button>
+        </div>
+    </header>
 
- ██╗    ██╗ ██████╗ ██████╗ ██╗     ██████╗ ██╗
- ██║    ██║██╔═══██╗██╔══██╗██║     ██╔══██╗██║
- ██║ █╗ ██║██║   ██║██████╔╝██║     ██║  ██║██║
- ██║███╗██║██║   ██║██╔══██╗██║     ██║  ██║╚═╝
- ╚███╔███╔╝╚██████╔╝██║  ██║███████╗██████╔╝██╗
-  ╚══╝╚══╝  ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═════╝ ╚═╝</pre>
-        <p class="subtitle">pyqmh &mdash; hello_world module</p>
+    <aside class="panel panel-tools">
+        <h2>Tools</h2>
+        <p>Drag a step type onto the canvas.</p>
+        <div id="tool-list"></div>
+    </aside>
+
+    <section class="canvas-wrap">
+        <svg id="sequence-canvas" aria-label="Sequence canvas"></svg>
+    </section>
+
+    <aside class="panel panel-right">
+        <section class="panel-block">
+            <h2>Parameters</h2>
+            <p id="selected-step-label">No step selected</p>
+            <div id="step-form"></div>
+            <button id="btn-delete-step" type="button" class="danger">Delete Step</button>
+        </section>
+    </aside>
+
+    <aside class="panel panel-variables">
+        <section class="panel-block">
+            <h2><center>Variables</center></h2>
+            <div class="row-inline">
+                <input id="new-variable-name" type="text" placeholder="variable_name" aria-label="Variable name">
+                <button id="btn-add-variable" type="button">Add</button>
+            </div>
+            <div id="variable-list"></div>
+        </section>
+    </aside>
+
+    <div id="step-tooltip" class="step-tooltip" role="tooltip" aria-hidden="true">
+        <div class="step-tooltip-title"></div>
+        <div class="step-tooltip-body"></div>
     </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ module_base_path }}/static/js/app.js"></script>
 {% endblock %}
