@@ -35,6 +35,7 @@ class PyqmhSequenceEditor(Module):
             self._workspace_root / "sequences",
         ]
         self._sequence_directory = self._resolve_initial_sequence_directory(default_sequence_dir)
+        self._module_commands: dict[str, dict[str, list[dict[str, list[str]]]]] = {}
 
     def handle_message(self, message: Message) -> bool:
         """Handle incoming messages.
@@ -60,7 +61,53 @@ class PyqmhSequenceEditor(Module):
             return self.set_sequence_directory(message)
         if message.command == "browse_sequence_directory":
             return self.browse_sequence_directory(message)
+        if message.command == "set_module_commands":
+            return self.set_module_commands(message)
         return super().handle_message(message)
+
+    def _normalize_command_entries(self, entries: Any, entry_kind: str) -> list[dict[str, list[str]]]:
+        if not isinstance(entries, list):
+            raise ValueError(f"{entry_kind} must be an array")
+
+        normalized_entries: list[dict[str, list[str]]] = []
+        for entry in entries:
+            if not isinstance(entry, dict) or len(entry) != 1:
+                raise ValueError(f"Each {entry_kind} entry must be an object with exactly one command")
+
+            command_name, argument_names = next(iter(entry.items()))
+            if not isinstance(command_name, str) or not command_name.strip():
+                raise ValueError(f"Each {entry_kind} command name must be a non-empty string")
+            if not isinstance(argument_names, list) or not all(
+                isinstance(argument_name, str) and argument_name.strip() for argument_name in argument_names
+            ):
+                raise ValueError(f"Each {entry_kind} command field list must contain non-empty strings")
+
+            normalized_entries.append(
+                {
+                    command_name.strip(): [argument_name.strip() for argument_name in argument_names],
+                }
+            )
+
+        return normalized_entries
+
+    def _normalize_module_commands(self, raw_commands: Any) -> dict[str, dict[str, list[dict[str, list[str]]]]]:
+        if not isinstance(raw_commands, dict):
+            raise ValueError("module_commands must be an object")
+
+        normalized_commands: dict[str, dict[str, list[dict[str, list[str]]]]] = {}
+        for module_name, module_commands in raw_commands.items():
+            if not isinstance(module_name, str) or not module_name.strip():
+                raise ValueError("Each module name must be a non-empty string")
+            if not isinstance(module_commands, dict):
+                raise ValueError(f"Commands for module '{module_name}' must be an object")
+
+            normalized_commands[module_name.strip()] = {
+                "actions": self._normalize_command_entries(module_commands.get("actions", []), "actions"),
+                "requests": self._normalize_command_entries(module_commands.get("requests", []), "requests"),
+                "responses": self._normalize_command_entries(module_commands.get("responses", []), "responses"),
+            }
+
+        return normalized_commands
 
     def _resolve_initial_sequence_directory(self, default_sequence_dir: Optional[str]) -> Path:
         if isinstance(default_sequence_dir, str) and default_sequence_dir.strip():
@@ -230,6 +277,27 @@ class PyqmhSequenceEditor(Module):
         )
         return False
 
+    def set_module_commands(self, message: Message) -> bool:
+        payload = self._payload_as_dict(message)
+
+        try:
+            raw_commands = payload.get("module_commands") if "module_commands" in payload else payload
+            self._module_commands = self._normalize_module_commands(raw_commands)
+        except ValueError as exc:
+            if message.source is not None:
+                self.protocol.send_response(message, {"ok": False, "error": str(exc)})
+            return False
+
+        if message.source is not None:
+            self.protocol.send_response(
+                message,
+                {
+                    "ok": True,
+                    "module_commands": self._module_commands,
+                },
+            )
+        return False
+
     def load_sequence(self, message: Message) -> bool:
         payload = self._payload_as_dict(message)
         raw_path = payload.get("path")
@@ -308,7 +376,9 @@ class PyqmhSequenceEditor(Module):
                     "get_sequence_directory",
                     "set_sequence_directory",
                     "browse_sequence_directory",
+                    "set_module_commands",
                 ],
+                "module_commands": self._module_commands,
             },
         )
         return False

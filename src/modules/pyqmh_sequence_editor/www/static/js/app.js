@@ -59,6 +59,7 @@
         selectedStepRef: null,
         currentPath: "",
         currentDirectory: "",
+        moduleCommands: {},
         dirty: false,
         fileList: [],
         transform: d3.zoomIdentity,
@@ -94,6 +95,23 @@
 
     function deepClone(value) {
         return JSON.parse(JSON.stringify(value));
+    }
+
+    function stripUiState(value) {
+        if (Array.isArray(value)) {
+            return value.map((item) => stripUiState(item));
+        }
+        if (value && typeof value === "object") {
+            const nextValue = {};
+            Object.keys(value).forEach((key) => {
+                if (key === "_ui") {
+                    return;
+                }
+                nextValue[key] = stripUiState(value[key]);
+            });
+            return nextValue;
+        }
+        return value;
     }
 
     function sanitizeStepId(raw) {
@@ -166,6 +184,108 @@
         state.dirty = Boolean(isDirty);
         const title = state.currentPath || "Untitled";
         document.title = `${state.dirty ? "* " : ""}${title} - pyqmh Sequence Editor`;
+    }
+
+    function getModuleCommandEntries(moduleId, entryKey) {
+        const moduleName = String(moduleId || "").trim();
+        if (!moduleName) {
+            return [];
+        }
+
+        const moduleCommands = state.moduleCommands[moduleName];
+        if (!moduleCommands || !Array.isArray(moduleCommands[entryKey])) {
+            return [];
+        }
+
+        return moduleCommands[entryKey]
+            .map((entry) => {
+                if (!entry || typeof entry !== "object") {
+                    return null;
+                }
+                const items = Object.entries(entry);
+                if (items.length !== 1) {
+                    return null;
+                }
+
+                const [name, fields] = items[0];
+                return {
+                    name,
+                    fields: Array.isArray(fields) ? fields : [],
+                };
+            })
+            .filter(Boolean);
+    }
+
+    function findModuleCommandEntry(moduleId, entryKey, commandName) {
+        return getModuleCommandEntries(moduleId, entryKey).find((entry) => entry.name === commandName) || null;
+    }
+
+    function buildStructuredValue(fieldNames, existingValue) {
+        const nextValue = {};
+        const currentValue = existingValue && typeof existingValue === "object" && !Array.isArray(existingValue)
+            ? existingValue
+            : {};
+
+        fieldNames.forEach((fieldName) => {
+            nextValue[fieldName] = Object.prototype.hasOwnProperty.call(currentValue, fieldName)
+                ? currentValue[fieldName]
+                : "";
+        });
+
+        return nextValue;
+    }
+
+    function applyStepCommandTemplate(step, commandName) {
+        const entryKey = step.Type === "Request" ? "requests" : "actions";
+        const commandEntry = findModuleCommandEntry(step["Module ID"], entryKey, commandName);
+        step.Action = commandName;
+
+        if (commandEntry) {
+            step.Arguments = buildStructuredValue(commandEntry.fields, step.Arguments);
+        }
+
+        if (step.Type === "Request") {
+            const responseEntry = findModuleCommandEntry(step["Module ID"], "responses", commandName);
+            if (responseEntry) {
+                step.Return = buildStructuredValue(responseEntry.fields, step.Return);
+            }
+        }
+    }
+
+    function getKnownModuleIds() {
+        return Object.keys(state.moduleCommands || {}).sort();
+    }
+
+    function buildSelectWithCustom(options) {
+        const select = document.createElement("select");
+
+        const promptOption = document.createElement("option");
+        promptOption.value = "";
+        promptOption.textContent = options.prompt;
+        select.appendChild(promptOption);
+
+        options.items.forEach((item) => {
+            const option = document.createElement("option");
+            option.value = item.value;
+            option.textContent = item.label;
+            select.appendChild(option);
+        });
+
+        const customOption = document.createElement("option");
+        customOption.value = "__custom__";
+        customOption.textContent = "Custom...";
+        select.appendChild(customOption);
+
+        select.value = options.selectedValue;
+        return select;
+    }
+
+    function clearStepCommandFields(step) {
+        step.Action = "";
+        step.Arguments = {};
+        if (step.Type === "Request") {
+            step.Return = {};
+        }
     }
 
     function getStepTypeHelp(type) {
@@ -806,6 +926,18 @@
         }
     }
 
+    async function loadModuleCommands() {
+        try {
+            const payload = await apiRequest("greet", {});
+            state.moduleCommands = payload && typeof payload.module_commands === "object" && payload.module_commands !== null
+                ? payload.module_commands
+                : {};
+        } catch (error) {
+            state.moduleCommands = {};
+            console.warn("Failed to load module commands", error);
+        }
+    }
+
     async function browseSequenceDirectory() {
         try {
             const payload = await apiRequest("browse_sequence_directory", {});
@@ -860,7 +992,7 @@
         try {
             const payload = await apiRequest("save_sequence", {
                 path: finalPath,
-                sequence: state.sequence,
+                sequence: stripUiState(state.sequence),
                 overwrite: Boolean(overwrite),
             });
             state.currentPath = payload.path;
@@ -1238,6 +1370,180 @@
         parent.appendChild(wrapper);
     }
 
+    function buildModuleIdField(parent, step) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "field-row";
+
+        const label = document.createElement("label");
+        label.textContent = "Module ID";
+        wrapper.appendChild(label);
+
+        const moduleIds = getKnownModuleIds();
+        const selectedValue = String(step["Module ID"] || "");
+        const uiState = step._ui && typeof step._ui === "object" ? step._ui : {};
+        const customValue = "__custom__";
+        const useCustomInput = uiState.moduleIdMode === customValue || (selectedValue && !moduleIds.includes(selectedValue));
+
+        if (moduleIds.length) {
+            const select = buildSelectWithCustom({
+                prompt: "Select module...",
+                items: moduleIds.map((moduleId) => ({ value: moduleId, label: moduleId })),
+                selectedValue: useCustomInput ? customValue : selectedValue,
+            });
+
+            select.addEventListener("change", function () {
+                const nextUiState = step._ui && typeof step._ui === "object" ? step._ui : {};
+                if (select.value && select.value !== customValue) {
+                    step._ui = { ...nextUiState, moduleIdMode: "" };
+                    step["Module ID"] = select.value;
+
+                    const entryKey = step.Type === "Request" ? "requests" : "actions";
+                    const commandNames = getModuleCommandEntries(step["Module ID"], entryKey).map((entry) => entry.name);
+                    if (!commandNames.includes(step.Action || "")) {
+                        clearStepCommandFields(step);
+                    }
+                } else if (select.value === customValue) {
+                    step._ui = { ...nextUiState, moduleIdMode: customValue };
+                }
+                setDirty(true);
+                renderAll();
+            });
+
+            wrapper.appendChild(select);
+        }
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.placeholder = "Custom module id";
+        input.value = selectedValue;
+        input.hidden = moduleIds.length > 0 && !useCustomInput;
+        input.addEventListener("change", function () {
+            const nextUiState = step._ui && typeof step._ui === "object" ? step._ui : {};
+            step._ui = { ...nextUiState, moduleIdMode: customValue };
+            step["Module ID"] = String(input.value || "").trim();
+            setDirty(true);
+            renderAll();
+        });
+
+        wrapper.appendChild(input);
+        parent.appendChild(wrapper);
+    }
+
+    function buildCommandField(parent, step) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "field-row";
+
+        const label = document.createElement("label");
+        label.textContent = step.Type === "Request" ? "Request" : "Action";
+        wrapper.appendChild(label);
+
+        const entryKey = step.Type === "Request" ? "requests" : "actions";
+        const commandEntries = getModuleCommandEntries(step["Module ID"], entryKey);
+        const commandNames = commandEntries.map((entry) => entry.name);
+        const customValue = "__custom__";
+        const selectedName = String(step.Action || "");
+        const uiState = step._ui && typeof step._ui === "object" ? step._ui : {};
+        const customModeKey = step.Type === "Request" ? "requestCommandMode" : "actionCommandMode";
+        const useCustomInput = uiState[customModeKey] === customValue || (selectedName && !commandNames.includes(selectedName));
+
+        if (commandEntries.length) {
+            const select = buildSelectWithCustom({
+                prompt: step.Type === "Request" ? "Select request..." : "Select action...",
+                items: commandEntries.map((entry) => ({ value: entry.name, label: entry.name })),
+                selectedValue: useCustomInput ? customValue : selectedName,
+            });
+
+            select.addEventListener("change", function () {
+                const nextUiState = step._ui && typeof step._ui === "object" ? step._ui : {};
+                if (select.value && select.value !== customValue) {
+                    step._ui = { ...nextUiState, [customModeKey]: "", responseMode: "", responseTemplate: select.value };
+                    applyStepCommandTemplate(step, select.value);
+                } else if (select.value === customValue) {
+                    step._ui = { ...nextUiState, [customModeKey]: customValue };
+                }
+                setDirty(true);
+                renderAll();
+            });
+
+            wrapper.appendChild(select);
+        }
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.placeholder = step.Type === "Request" ? "Custom request" : "Custom action";
+        input.value = selectedName;
+        input.hidden = commandEntries.length > 0 && !useCustomInput;
+        input.addEventListener("change", function () {
+            const nextUiState = step._ui && typeof step._ui === "object" ? step._ui : {};
+            step._ui = { ...nextUiState, [customModeKey]: customValue };
+            step.Action = String(input.value || "").trim();
+            setDirty(true);
+            renderAll();
+        });
+
+        wrapper.appendChild(input);
+        parent.appendChild(wrapper);
+    }
+
+    function buildReturnField(parent, step) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "field-row";
+
+        const label = document.createElement("label");
+        label.textContent = "Response";
+        wrapper.appendChild(label);
+
+        const responseEntries = getModuleCommandEntries(step["Module ID"], "responses");
+        const responseNames = responseEntries.map((entry) => entry.name);
+        const uiState = step._ui && typeof step._ui === "object" ? step._ui : {};
+        const customValue = "__custom__";
+        const preferredTemplate = uiState.responseTemplate || (responseNames.includes(step.Action || "") ? step.Action : "");
+        const useCustomInput = uiState.responseMode === customValue;
+
+        if (responseEntries.length) {
+            const select = buildSelectWithCustom({
+                prompt: "Select response...",
+                items: responseEntries.map((entry) => ({ value: entry.name, label: entry.name })),
+                selectedValue: useCustomInput ? customValue : preferredTemplate,
+            });
+
+            select.addEventListener("change", function () {
+                const nextUiState = step._ui && typeof step._ui === "object" ? step._ui : {};
+                if (select.value && select.value !== customValue) {
+                    const responseEntry = findModuleCommandEntry(step["Module ID"], "responses", select.value);
+                    step._ui = { ...nextUiState, responseMode: "", responseTemplate: select.value };
+                    if (responseEntry) {
+                        step.Return = buildStructuredValue(responseEntry.fields, step.Return);
+                    }
+                } else if (select.value === customValue) {
+                    step._ui = { ...nextUiState, responseMode: customValue };
+                }
+                setDirty(true);
+                renderAll();
+            });
+
+            wrapper.appendChild(select);
+        }
+
+        const textarea = document.createElement("textarea");
+        textarea.value = JSON.stringify(step.Return ?? {}, null, 2);
+        textarea.addEventListener("change", function () {
+            const nextUiState = step._ui && typeof step._ui === "object" ? step._ui : {};
+            try {
+                step.Return = JSON.parse(textarea.value);
+            } catch (_) {
+                setStatus("Invalid JSON for Return.", true);
+                return;
+            }
+            step._ui = { ...nextUiState, responseMode: customValue };
+            setDirty(true);
+            renderAll();
+        });
+
+        wrapper.appendChild(textarea);
+        parent.appendChild(wrapper);
+    }
+
     function renderStepForm() {
         const form = document.getElementById("step-form");
         const selectedLabel = document.getElementById("selected-step-label");
@@ -1297,9 +1603,21 @@
         form.appendChild(typeWrap);
 
         Object.keys(step)
-            .filter((key) => !["ID", "Description", "Type"].includes(key))
+            .filter((key) => !["ID", "Description", "Type", "_ui"].includes(key))
             .filter((key) => !isStepArray(step[key]))
             .forEach((key) => {
+                if (key === "Module ID" && (step.Type === "Action" || step.Type === "Request")) {
+                    buildModuleIdField(form, step);
+                    return;
+                }
+                if (key === "Action" && (step.Type === "Action" || step.Type === "Request")) {
+                    buildCommandField(form, step);
+                    return;
+                }
+                if (key === "Return" && step.Type === "Request") {
+                    buildReturnField(form, step);
+                    return;
+                }
                 buildField(form, key, step[key], (nextValue) => {
                     step[key] = nextValue;
                 });
@@ -1549,6 +1867,7 @@
         renderToolPanel();
         setupCanvas();
         bindControls();
+        await loadModuleCommands();
         renderAll();
         await refreshFileList();
     }

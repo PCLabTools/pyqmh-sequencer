@@ -12,6 +12,42 @@ from modules.pyqmh_sequence_editor import PyqmhSequenceEditor
 from modules.power_supply import PowerSupply
 from modules.power_meter import PowerMeter
 
+
+SEQUENCE_EDITOR_MODULE_COMMANDS = {
+    "power_supply": {
+        "actions": [
+            {"configure_output": ["voltage", "current_limit"]},
+            {"enable_output": ["enabled"]},
+            {"set_load": ["load_resistance"]},
+            {"shutdown": []},
+        ],
+        "requests": [
+            {"greet": []},
+            {"read_output": []},
+        ],
+        "responses": [
+            {"read_output": ["output_enabled", "configured_voltage", "current_limit", "load_resistance", "voltage", "current", "power"]},
+            {"greet": ["module", "kind", "commands"]},
+        ],
+    },
+    "power_meter": {
+        "actions": [
+            {"set_noise": ["noise_percent"]},
+            {"shutdown": []},
+        ],
+        "requests": [
+            {"greet": []},
+            {"measure": []},
+            {"read_status": []},
+        ],
+        "responses": [
+            {"measure": ["channel", "voltage", "current", "power", "source"]},
+            {"read_status": ["noise_percent", "last_measurement"]},
+            {"greet": ["module", "kind", "commands"]},
+        ],
+    },
+}
+
 class App():
     def __init__(self, debug: bool = False):
         self.debug = debug
@@ -28,6 +64,11 @@ class App():
             self.protocol,
             debug=self.debug,
             default_sequence_dir="doc/example sequences",
+        )
+        self.protocol.send_action(
+            "pyqmh_sequence_editor",
+            "set_module_commands",
+            payload=SEQUENCE_EDITOR_MODULE_COMMANDS,
         )
         # Example("ExampleModule", self.protocol, debug=self.debug)
 
