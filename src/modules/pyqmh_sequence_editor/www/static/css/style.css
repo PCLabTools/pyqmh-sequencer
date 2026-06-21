@@ -4,6 +4,10 @@
     --nav-height: 58px;
     --shadow-soft: 0 14px 42px rgba(16, 33, 46, 0.2);
     --shadow-nav: 0 8px 24px rgba(16, 33, 46, 0.22);
+    --toolbar-top: 14px;
+    --toolbar-min-height: 78px;
+    --toolbar-panel-gap: 18px;
+    --floating-panel-top: calc(var(--toolbar-top) + var(--toolbar-min-height) + var(--toolbar-panel-gap));
 }
 
 html[data-theme="dark"] {
@@ -248,7 +252,7 @@ body.no-nav #main-content {
 
 .editor-toolbar {
     position: absolute;
-    top: 14px;
+    top: var(--toolbar-top);
     left: 24px;
     right: 24px;
     z-index: 45;
@@ -385,10 +389,10 @@ button.danger {
 }
 
 .panel-tools {
-    top: 98px;
+    top: var(--floating-panel-top);
     left: 24px;
     width: 250px;
-    max-height: calc(100% - 122px);
+    max-height: calc(100% - (var(--floating-panel-top) + 24px));
     overflow: auto;
     padding: 14px;
 }
@@ -422,10 +426,10 @@ button.danger {
 }
 
 .panel-right {
-    top: 98px;
+    top: var(--floating-panel-top);
     right: 24px;
     width: 330px;
-    max-height: calc(100% - 122px);
+    max-height: calc(100% - (var(--floating-panel-top) + 24px));
     overflow: auto;
     display: grid;
     gap: 10px;

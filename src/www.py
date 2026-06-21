@@ -206,6 +206,7 @@ class WebGui:
 			template_folder=os.path.join(self.src_dir, "www", "templates"),
 			static_folder=os.path.join(self.src_dir, "www", "static"),
 		)
+		flask_app.json.sort_keys = False
 
 		module_names = self._discover_module_web_apps()
 
