@@ -1,53 +1,13 @@
 """
-file: app.py
-description: pyqmh Sequencer for developing the editor and test executive
+file: pyqmh_sequence_engine/app.py
+description: pyqmh Sequence Engine designed to execute sequences
 author: Larry
 """
 
 import logging
 import argparse
 from pyqmh import Protocol, Message
-from www import WebGui
-from modules.pyqmh_sequence_editor import PyqmhSequenceEditor
-from modules.power_supply import PowerSupply
-from modules.power_meter import PowerMeter
-from modules.pyqmh_sequence_engine import PyqmhSequenceEngine
-
-
-SEQUENCE_EDITOR_MODULE_COMMANDS = {
-    "power_supply": {
-        "actions": [
-            {"configure_output": ["voltage", "current_limit"]},
-            {"enable_output": ["enabled"]},
-            {"set_load": ["load_resistance"]},
-            {"shutdown": []},
-        ],
-        "requests": [
-            {"greet": []},
-            {"read_output": []},
-        ],
-        "responses": [
-            {"read_output": ["output_enabled", "configured_voltage", "current_limit", "load_resistance", "voltage", "current", "power"]},
-            {"greet": ["module", "kind", "commands"]},
-        ],
-    },
-    "power_meter": {
-        "actions": [
-            {"set_noise": ["noise_percent"]},
-            {"shutdown": []},
-        ],
-        "requests": [
-            {"greet": []},
-            {"measure": []},
-            {"read_status": []},
-        ],
-        "responses": [
-            {"measure": ["channel", "voltage", "current", "power", "source"]},
-            {"read_status": ["noise_percent", "last_measurement"]},
-            {"greet": ["module", "kind", "commands"]},
-        ],
-    },
-}
+from module import PyqmhSequenceEngine
 
 class App():
     def __init__(self, debug: bool = False):
@@ -58,23 +18,7 @@ class App():
         self.logger.setLevel(logging.DEBUG if self.debug else logging.INFO)
 
         # Register modules here
-        PyqmhSequenceEngine("pyqmh_sequence_engine", self.protocol, debug=self.debug)
-        PowerMeter("power_meter", self.protocol, debug=self.debug)
-        PowerSupply("power_supply", self.protocol, debug=self.debug)
-        PyqmhSequenceEditor(
-            "pyqmh_sequence_editor",
-            self.protocol,
-            debug=self.debug,
-            default_sequence_dir="doc/example sequences",
-        )
-        self.protocol.send_action(
-            "pyqmh_sequence_editor",
-            "set_module_commands",
-            payload=SEQUENCE_EDITOR_MODULE_COMMANDS,
-        )
-        # Example("ExampleModule", self.protocol, debug=self.debug)
-
-        self._web_gui = WebGui(logger=self.logger, protocol=self.protocol)
+        PyqmhSequenceEngine("PyqmhSequenceEngine", self.protocol, debug=self.debug)
 
     def __del__(self):
         """Clean up the main module by deleting the protocol instance.
@@ -85,7 +29,8 @@ class App():
         """Run the main application loop and handles application shutdown.
         """
         self.logger.debug("Starting main application loop.")
-        self._web_gui.start()
+
+        # Perform any actions needed before entering the main loop, such as initializing modules or setting up resources.
 
         print(f"\033[92mMain application loop has started. Press Ctrl+C to exit.\033[0m")
 
@@ -133,4 +78,3 @@ if __name__ == "__main__":
     )
     app = App(debug=args.debug)
     app.run()
-    # app.run()

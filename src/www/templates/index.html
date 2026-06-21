@@ -3,9 +3,477 @@
 {% block title %}pyqmh{% endblock %}
 
 {% block content %}
-<div class="welcome">
-    <div class="welcome-logo">pyqmh</div>
-    <p class="welcome-sub">Python Queued Message Handler</p>
-    <p class="welcome-hint">Select a module from the navigation bar to get started.</p>
+<div class="home-layout">
+    <section class="panel sequence-panel">
+        <div class="panel-header">
+            <h1>Sequence Engine</h1>
+            <p>Operate the headless sequence engine directly from the main application.</p>
+        </div>
+
+        <div class="control-grid">
+            <label class="field">
+                <span>Sequence Folder Path</span>
+                <input id="sequence-folder-path" type="text" placeholder="doc/example sequences">
+            </label>
+            <button class="btn" id="btn-set-sequence-folder">Set Folder</button>
+
+            <label class="field">
+                <span>Sequence Name or Path</span>
+                <select id="sequence-name-select" class="input-select">
+                    <option value="" selected disabled>Select a sequence...</option>
+                    <option value="__custom__">Custom...</option>
+                </select>
+                <input id="sequence-name-custom" type="text" placeholder="Custom path e.g. subscripts/helper_sequence.json" hidden>
+            </label>
+            <button class="btn" id="btn-load-sequence">Load Sequence</button>
+
+            <label class="field">
+                <span>Report Path</span>
+                <input id="report-path" type="text" placeholder="doc/report.md">
+            </label>
+            <button class="btn" id="btn-set-report-path">Set Report Path</button>
+
+            <label class="field checkbox-field">
+                <span>Enable Report File Output</span>
+                <input id="report-enabled" type="checkbox" checked>
+            </label>
+            <button class="btn" id="btn-set-report-enabled">Apply Report Setting</button>
+        </div>
+
+        <div class="button-row">
+            <button class="btn strong" id="btn-run">Run</button>
+            <button class="btn" id="btn-pause">Pause</button>
+            <button class="btn warn" id="btn-stop">Stop</button>
+            <button class="btn" id="btn-unload">Unload</button>
+        </div>
+
+        <div id="engine-feedback" class="feedback" aria-live="polite">Ready.</div>
+
+        <div class="panel-header compact">
+            <h2>Status</h2>
+        </div>
+        <pre id="status-output" class="output-box"></pre>
+    </section>
+
+    <section class="panel output-panel">
+        <div class="panel-header">
+            <h2>Report</h2>
+        </div>
+        <pre id="report-output" class="output-box report"></pre>
+    </section>
 </div>
+
+<div id="floating-prompt" class="floating-prompt" hidden>
+    <div class="floating-prompt-backdrop"></div>
+    <div class="floating-prompt-card" role="dialog" aria-modal="true" aria-labelledby="floating-prompt-title">
+        <h3 id="floating-prompt-title">Sequence Prompt</h3>
+        <p id="floating-prompt-message" class="floating-prompt-message"></p>
+
+        <div id="floating-prompt-input-wrap" class="floating-prompt-input-wrap">
+            <input id="floating-prompt-input" type="text" placeholder="Enter response">
+        </div>
+
+        <div class="floating-prompt-actions">
+            <button id="floating-prompt-cancel" class="btn">Cancel (False)</button>
+            <button id="floating-prompt-confirm" class="btn strong">Submit</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const statusOutput = document.getElementById('status-output');
+        const reportOutput = document.getElementById('report-output');
+        const feedback = document.getElementById('engine-feedback');
+        const sequenceNameSelect = document.getElementById('sequence-name-select');
+        const sequenceNameCustom = document.getElementById('sequence-name-custom');
+        const floatingPrompt = document.getElementById('floating-prompt');
+        const floatingPromptTitle = document.getElementById('floating-prompt-title');
+        const floatingPromptMessage = document.getElementById('floating-prompt-message');
+        const floatingPromptInputWrap = document.getElementById('floating-prompt-input-wrap');
+        const floatingPromptConfirm = document.getElementById('floating-prompt-confirm');
+        const floatingPromptCancel = document.getElementById('floating-prompt-cancel');
+
+        let activePrompt = null;
+        let activePromptKey = null;
+        let pollInFlight = false;
+        let lastKnownStatus = 'idle';
+        let sequenceChoices = [];
+
+        function updateSequenceInputMode() {
+            const isCustom = sequenceNameSelect.value === '__custom__';
+            sequenceNameCustom.hidden = !isCustom;
+            if (isCustom) {
+                setTimeout(function () { sequenceNameCustom.focus(); }, 0);
+            }
+        }
+
+        function selectedSequenceValue() {
+            if (sequenceNameSelect.value === '__custom__') {
+                return sequenceNameCustom.value.trim();
+            }
+            return sequenceNameSelect.value;
+        }
+
+        function setSelectedSequenceValue(value) {
+            const normalized = String(value || '').trim();
+            if (!normalized) {
+                return;
+            }
+            const matching = sequenceChoices.find(function (choice) {
+                return choice.value === normalized || choice.value === normalized + '.json' || choice.value.replace(/\.json$/i, '') === normalized;
+            });
+
+            if (matching) {
+                sequenceNameSelect.value = matching.value;
+                sequenceNameCustom.value = '';
+            } else {
+                sequenceNameSelect.value = '__custom__';
+                sequenceNameCustom.value = normalized;
+            }
+            updateSequenceInputMode();
+        }
+
+        async function refreshSequenceChoices() {
+            try {
+                const response = await fetch('/api/sequence_engine/sequences', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ timeout_ms: 3000 }),
+                });
+                const payload = await response.json();
+                if (!payload.ok) {
+                    return;
+                }
+
+                const previousValue = selectedSequenceValue();
+                sequenceChoices = Array.isArray(payload.choices) ? payload.choices : [];
+
+                while (sequenceNameSelect.options.length > 0) {
+                    sequenceNameSelect.remove(0);
+                }
+
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = 'Select a sequence...';
+                placeholder.disabled = true;
+                sequenceNameSelect.appendChild(placeholder);
+
+                sequenceChoices.forEach(function (choice) {
+                    const option = document.createElement('option');
+                    option.value = choice.value;
+                    option.textContent = choice.label;
+                    sequenceNameSelect.appendChild(option);
+                });
+
+                const custom = document.createElement('option');
+                custom.value = '__custom__';
+                custom.textContent = 'Custom...';
+                sequenceNameSelect.appendChild(custom);
+
+                if (previousValue) {
+                    setSelectedSequenceValue(previousValue);
+                } else {
+                    sequenceNameSelect.value = '';
+                    sequenceNameCustom.value = '';
+                    updateSequenceInputMode();
+                }
+            } catch (_) {
+                // Non-blocking: user can still use Custom mode.
+            }
+        }
+
+        function promptKey(prompt) {
+            if (!prompt) {
+                return '';
+            }
+            return [prompt.step_id || '', prompt.prompt_type || '', prompt.title || '', prompt.message || ''].join('|');
+        }
+
+        function setFeedback(text, isError) {
+            feedback.textContent = text;
+            feedback.classList.toggle('error', Boolean(isError));
+        }
+
+        function normalizePromptType(prompt) {
+            return String((prompt && prompt.prompt_type) || '').trim().toUpperCase();
+        }
+
+        function hideFloatingPrompt() {
+            activePrompt = null;
+            activePromptKey = null;
+            floatingPrompt.hidden = true;
+            floatingPrompt.classList.remove('show');
+        }
+
+        function renderFloatingPrompt(promptState) {
+            const waiting = Boolean(promptState && promptState.prompt_waiting);
+            const prompt = waiting ? (promptState.prompt || null) : null;
+            if (!waiting || !prompt) {
+                hideFloatingPrompt();
+                return;
+            }
+
+            const nextPromptKey = promptKey(prompt);
+
+            // Avoid rebuilding the modal for the same prompt so user input is not cleared by polling.
+            if (activePromptKey === nextPromptKey && !floatingPrompt.hidden) {
+                return;
+            }
+
+            activePrompt = prompt;
+            activePromptKey = nextPromptKey;
+            const promptType = normalizePromptType(prompt);
+            const title = prompt.title || 'Sequence Prompt';
+            const message = prompt.message || 'Enter a response to continue sequence execution.';
+
+            floatingPromptTitle.textContent = title;
+            floatingPromptMessage.textContent = message;
+
+            floatingPromptInputWrap.innerHTML = '';
+            if (promptType === 'CONFIRM') {
+                const hint = document.createElement('div');
+                hint.className = 'floating-prompt-hint';
+                hint.textContent = 'Click Confirm to acknowledge and continue.';
+                floatingPromptInputWrap.appendChild(hint);
+                floatingPromptConfirm.textContent = 'Confirm';
+                floatingPromptCancel.hidden = true;
+            } else if (promptType === 'OK/CANCEL') {
+                const hint = document.createElement('div');
+                hint.className = 'floating-prompt-hint';
+                hint.textContent = 'Choose OK to continue or Cancel to return false.';
+                floatingPromptInputWrap.appendChild(hint);
+                floatingPromptConfirm.textContent = 'OK';
+                floatingPromptCancel.textContent = 'Cancel';
+                floatingPromptCancel.hidden = false;
+            } else if (promptType === 'NUMBER') {
+                const input = document.createElement('input');
+                input.id = 'floating-prompt-input';
+                input.type = 'number';
+                input.step = 'any';
+                input.placeholder = 'Enter numeric value';
+                floatingPromptInputWrap.appendChild(input);
+                floatingPromptConfirm.textContent = 'Submit';
+                floatingPromptCancel.hidden = true;
+                setTimeout(function () { input.focus(); }, 0);
+            } else {
+                const input = document.createElement('input');
+                input.id = 'floating-prompt-input';
+                input.type = 'text';
+                input.placeholder = 'Enter text response';
+                floatingPromptInputWrap.appendChild(input);
+                floatingPromptConfirm.textContent = 'Submit';
+                floatingPromptCancel.hidden = true;
+                setTimeout(function () { input.focus(); }, 0);
+            }
+
+            floatingPrompt.hidden = false;
+            floatingPrompt.classList.add('show');
+        }
+
+        function getFloatingPromptPayload(confirmTrue) {
+            const promptType = normalizePromptType(activePrompt);
+            if (promptType === 'CONFIRM' || promptType === 'OK/CANCEL') {
+                return { value: Boolean(confirmTrue) };
+            }
+
+            const input = document.getElementById('floating-prompt-input');
+            const value = input ? input.value : '';
+            if (promptType === 'NUMBER') {
+                if (value === '') {
+                    return { value: 0 };
+                }
+                const asNumber = Number(value);
+                if (Number.isNaN(asNumber)) {
+                    throw new Error('Prompt expects a numeric value.');
+                }
+                return { value: asNumber };
+            }
+            return { value: value };
+        }
+
+        async function submitFloatingPrompt(confirmTrue) {
+            if (!activePrompt) {
+                return;
+            }
+            try {
+                const payload = getFloatingPromptPayload(confirmTrue);
+                const result = await callEngineAction('confirm_prompt', payload);
+                if (!result.ok) {
+                    setFeedback(result.error || 'Failed to submit prompt response.', true);
+                    return;
+                }
+                setFeedback('Prompt response submitted.', false);
+                hideFloatingPrompt();
+                await pollEngineState();
+            } catch (error) {
+                setFeedback((error && error.message) || 'Invalid prompt response.', true);
+            }
+        }
+
+        async function callEngineAction(action, argumentsPayload) {
+            const response = await fetch('/api/sequence_engine/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: action, arguments: argumentsPayload || {} }),
+            });
+            return response.json();
+        }
+
+        async function callEngineRequest(requestName, argumentsPayload, timeoutMs) {
+            const response = await fetch('/api/sequence_engine/request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    request: requestName,
+                    arguments: argumentsPayload || {},
+                    timeout_ms: timeoutMs || 2000,
+                }),
+            });
+            return response.json();
+        }
+
+        async function refreshStatus() {
+            const result = await callEngineRequest('status', {}, 2500);
+            if (result.ok && result.response) {
+                lastKnownStatus = String(result.response.status || 'idle').toLowerCase();
+                statusOutput.textContent = JSON.stringify(result.response, null, 2);
+                const reportEnabled = document.getElementById('report-enabled');
+                if (typeof result.response.report_enabled === 'boolean') {
+                    reportEnabled.checked = result.response.report_enabled;
+                }
+                if (typeof result.response.sequence_folder_path === 'string') {
+                    document.getElementById('sequence-folder-path').value = result.response.sequence_folder_path;
+                }
+                if (typeof result.response.loaded_sequence === 'string') {
+                    setSelectedSequenceValue(result.response.loaded_sequence);
+                }
+                if (typeof result.response.report_path === 'string') {
+                    document.getElementById('report-path').value = result.response.report_path;
+                }
+                renderFloatingPrompt({
+                    prompt_waiting: result.response.prompt_waiting,
+                    prompt: result.response.prompt,
+                });
+                if (result.response.prompt_waiting) {
+                    setFeedback('Prompt waiting for response.', false);
+                }
+                return;
+            }
+            statusOutput.textContent = JSON.stringify(result, null, 2);
+            setFeedback(result.error || 'Failed to read status.', true);
+        }
+
+        async function refreshReport() {
+            const result = await callEngineRequest('get_report', {}, 4000);
+            if (result.ok && result.response) {
+                reportOutput.textContent = result.response.report || '';
+                return;
+            }
+            reportOutput.textContent = JSON.stringify(result, null, 2);
+            setFeedback(result.error || 'Failed to read report.', true);
+        }
+
+        function shouldPollReport(status) {
+            return status === 'running' || status === 'paused' || status === 'completed' || status === 'error' || status === 'stopped';
+        }
+
+        async function pollEngineState() {
+            if (pollInFlight) {
+                return;
+            }
+            pollInFlight = true;
+            try {
+                await refreshStatus();
+
+                if (shouldPollReport(lastKnownStatus)) {
+                    await refreshReport();
+                }
+            } catch (_) {
+                // Individual refresh calls already update feedback on failure.
+            } finally {
+                pollInFlight = false;
+            }
+        }
+
+        async function doAction(action, args, successText) {
+            const result = await callEngineAction(action, args || {});
+            if (!result.ok) {
+                setFeedback(result.error || ('Action failed: ' + action), true);
+                return;
+            }
+            setFeedback(successText || ('Action sent: ' + action), false);
+            await pollEngineState();
+        }
+
+        document.getElementById('btn-set-sequence-folder').addEventListener('click', async function () {
+            await doAction('sequence_folder_path', { path: document.getElementById('sequence-folder-path').value }, 'Sequence folder updated.');
+            await refreshSequenceChoices();
+        });
+
+        document.getElementById('btn-load-sequence').addEventListener('click', async function () {
+            const selected = selectedSequenceValue();
+            if (!selected) {
+                setFeedback('Select a sequence or choose Custom and enter a path.', true);
+                return;
+            }
+            await doAction('load_sequence', { name: selected }, 'Sequence loaded.');
+        });
+
+        document.getElementById('btn-set-report-path').addEventListener('click', async function () {
+            await doAction('report_path', { path: document.getElementById('report-path').value }, 'Report path updated.');
+        });
+
+        document.getElementById('btn-set-report-enabled').addEventListener('click', async function () {
+            await doAction('enable_report', { enabled: document.getElementById('report-enabled').checked }, 'Report enable setting updated.');
+        });
+
+        document.getElementById('btn-run').addEventListener('click', async function () {
+            await doAction('run_sequence', {}, 'Run command sent.');
+        });
+
+        document.getElementById('btn-pause').addEventListener('click', async function () {
+            await doAction('pause_sequence', {}, 'Pause command sent.');
+        });
+
+        document.getElementById('btn-stop').addEventListener('click', async function () {
+            await doAction('stop_sequence', {}, 'Stop command sent.');
+        });
+
+        document.getElementById('btn-unload').addEventListener('click', async function () {
+            await doAction('unload_sequence', {}, 'Sequence unloaded.');
+            reportOutput.textContent = '';
+            hideFloatingPrompt();
+        });
+
+        floatingPromptConfirm.addEventListener('click', function () {
+            submitFloatingPrompt(true);
+        });
+
+        floatingPromptCancel.addEventListener('click', function () {
+            submitFloatingPrompt(false);
+        });
+
+        floatingPrompt.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                submitFloatingPrompt(true);
+            }
+        });
+
+        sequenceNameSelect.addEventListener('change', updateSequenceInputMode);
+
+        document.addEventListener('DOMContentLoaded', async function () {
+            updateSequenceInputMode();
+            await refreshSequenceChoices();
+            await pollEngineState();
+        });
+
+        setInterval(function () {
+            pollEngineState().catch(function () {});
+        }, 1000);
+
+        pollEngineState().catch(function () {});
+    })();
+</script>
 {% endblock %}

@@ -207,6 +207,9 @@ class WebGui:
 			static_folder=os.path.join(self.src_dir, "www", "static"),
 		)
 		flask_app.json.sort_keys = False
+		# Keep UI iteration predictable in local dev: always re-render templates and avoid static cache.
+		flask_app.config["TEMPLATES_AUTO_RELOAD"] = True
+		flask_app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
 		module_names = self._discover_module_web_apps()
 
@@ -354,6 +357,117 @@ class WebGui:
 				return jsonify({"ok": False, "error": "Request timed out"}), 504
 			except Exception as exc:
 				self.logger.exception("Failed request %s on %s", action, name)
+				return jsonify({"ok": False, "error": str(exc)}), 500
+
+		@flask_app.post("/api/sequence_engine/action")
+		def sequence_engine_action():
+			body = request.get_json(silent=True) or {}
+			action = body.get("action")
+			arguments = body.get("arguments", {})
+
+			if not isinstance(action, str) or not action:
+				return jsonify({"ok": False, "error": "Missing action"}), 400
+			if not isinstance(arguments, dict):
+				return jsonify({"ok": False, "error": "arguments must be an object"}), 400
+
+			try:
+				self.protocol.send_action("pyqmh_sequence_engine", action, payload=arguments)
+				return jsonify({"ok": True, "action": action, "module": "pyqmh_sequence_engine"})
+			except Exception as exc:
+				self.logger.exception("Failed sequence engine action %s", action)
+				return jsonify({"ok": False, "error": str(exc)}), 500
+
+		@flask_app.post("/api/sequence_engine/request")
+		def sequence_engine_request():
+			body = request.get_json(silent=True) or {}
+			request_name = body.get("request")
+			arguments = body.get("arguments", {})
+			timeout_ms = body.get("timeout_ms", 2000)
+
+			if not isinstance(request_name, str) or not request_name:
+				return jsonify({"ok": False, "error": "Missing request"}), 400
+			if not isinstance(arguments, dict):
+				return jsonify({"ok": False, "error": "arguments must be an object"}), 400
+
+			try:
+				timeout_s = max(0.05, float(timeout_ms) / 1000.0)
+			except (TypeError, ValueError):
+				timeout_s = 2.0
+
+			try:
+				response = self.protocol.send_request(
+					"pyqmh_sequence_engine",
+					request_name,
+					payload=arguments,
+					timeout=timeout_s,
+				)
+				return jsonify({"ok": True, "request": request_name, "module": "pyqmh_sequence_engine", "response": response})
+			except TimeoutError:
+				return jsonify({"ok": False, "error": "Request timed out"}), 504
+			except Exception as exc:
+				self.logger.exception("Failed sequence engine request %s", request_name)
+				return jsonify({"ok": False, "error": str(exc)}), 500
+
+		@flask_app.post("/api/sequence_engine/sequences")
+		def sequence_engine_sequences():
+			body = request.get_json(silent=True) or {}
+			timeout_ms = body.get("timeout_ms", 2000)
+
+			try:
+				timeout_s = max(0.05, float(timeout_ms) / 1000.0)
+			except (TypeError, ValueError):
+				timeout_s = 2.0
+
+			try:
+				status_response = self.protocol.send_request(
+					"pyqmh_sequence_engine",
+					"status",
+					payload={},
+					timeout=timeout_s,
+				)
+				sequence_dir = status_response.get("sequence_folder_path", "")
+
+				editor_response = self.protocol.send_request(
+					"pyqmh_sequence_editor",
+					"list_sequences",
+					payload={"directory": sequence_dir},
+					timeout=timeout_s,
+				)
+
+				files = editor_response.get("files", []) if isinstance(editor_response, dict) else []
+				normalized_dir = str(sequence_dir or "").replace("\\", "/").strip("/")
+				choices = []
+				for file_path in files:
+					if not isinstance(file_path, str):
+						continue
+					normalized = file_path.replace("\\", "/")
+					if not normalized.lower().endswith(".json"):
+						continue
+
+					relative = normalized
+					if normalized_dir and (normalized == normalized_dir or normalized.startswith(normalized_dir + "/")):
+						relative = normalized[len(normalized_dir):].lstrip("/")
+
+					choices.append(
+						{
+							"value": relative,
+							"label": relative,
+							"path": normalized,
+						}
+					)
+
+				choices = sorted(choices, key=lambda item: item["label"].lower())
+				return jsonify(
+					{
+						"ok": True,
+						"sequence_folder_path": sequence_dir,
+						"choices": choices,
+					}
+				)
+			except TimeoutError:
+				return jsonify({"ok": False, "error": "Sequence list request timed out"}), 504
+			except Exception as exc:
+				self.logger.exception("Failed to get sequence list")
 				return jsonify({"ok": False, "error": str(exc)}), 500
 
 		@flask_app.route("/module/<name>/app/module/<sub_name>")

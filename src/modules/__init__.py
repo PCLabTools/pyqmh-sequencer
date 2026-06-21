@@ -6,4 +6,5 @@ from .power_supply.factory import PowerSupply
 
 from .power_meter.factory import PowerMeter
 
-__all__ = ["PyqmhSequenceEditor", "PowerSupply", "PowerMeter"]
+from .pyqmh_sequence_engine.module import PyqmhSequenceEngine
+__all__ = ["PyqmhSequenceEditor", "PowerSupply", "PowerMeter", "PyqmhSequenceEngine"]
