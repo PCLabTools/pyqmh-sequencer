@@ -31,6 +31,7 @@
         "For Each": "Runs a SubSequence for each element in an array.",
         While: "Repeats a SubSequence while a condition remains active.",
         "Do While": "Runs a SubSequence first, then repeats based on condition.",
+        "Loop End": "Marks the point where loop execution exits back to main flow.",
         Break: "Breaks out of the current loop or nested SubSequence.",
         If: "Branches flow into OnTrue or OnFalse SubSequences.",
         Call: "Calls another sequence inline or on a separate thread.",
@@ -47,6 +48,7 @@
         nodeWidth: 190,
         nodeHeight: 92,
         startY: 130,
+        endNodeDiameter: 56,
     };
     const NODE_DESCRIPTION_FONT = '10px "IBM Plex Mono", Consolas, monospace';
     const NODE_DESCRIPTION_MAX_LINES = 3;
@@ -611,15 +613,18 @@
     function buildDropOptions(targetNode) {
         const options = [];
         const baseY = targetNode.y + targetNode.height / 2 + 40;
+        const branchSourceStep = targetNode.isLoopEnd ? targetNode.loopStep : targetNode.step;
+        const branches = getSubsequenceFields(branchSourceStep);
+        const hasCenterBranch = branches.some((branch) => branch.key === "SubSequence");
+
         options.push({
             id: "main",
             kind: "main",
-            label: "main",
+            label: targetNode.isLoopEnd ? "after" : "main",
             x: targetNode.x,
-            y: baseY,
+            y: baseY + (hasCenterBranch ? 52 : 0),
         });
 
-        const branches = getSubsequenceFields(targetNode.step);
         if (!branches.length) {
             return options;
         }
@@ -674,13 +679,17 @@
                 ? preferredSide[branch.key]
                 : null;
             const offset = reserveSlot(preferred);
+            let optionY = baseY;
+            if (branch.key === "SubSequence") {
+                optionY = targetNode.isLoopEnd ? baseY - 58 : baseY;
+            }
             options.push({
                 id: `branch:${branch.key}`,
                 kind: "branch",
                 branchKey: branch.key,
                 label: branch.key,
                 x: targetNode.x + offset * spacing,
-                y: baseY,
+                y: optionY,
             });
         });
 
@@ -780,11 +789,13 @@
 
         const options = buildDropOptions(targetNode);
         const activeOption = chooseActiveDropOption(options, worldPoint);
-        const targetParent = getParentArrayFromRef(targetNode.ref);
+        const targetParent = targetNode.isLoopEnd
+            ? getParentArrayFromRef(targetNode.loopRef)
+            : getParentArrayFromRef(targetNode.ref);
         state.dropPreview = {
             targetNode,
             targetRef: targetNode.ref,
-            targetStep: targetNode.step,
+            targetStep: targetNode.isLoopEnd ? targetNode.loopStep : targetNode.step,
             targetArray: targetParent ? targetParent.array : null,
             targetIndex: targetParent ? targetParent.index : -1,
             options,
@@ -1024,6 +1035,7 @@
             let firstRef = null;
             let incomingRefs = [];
             let maxYUsed = startY;
+            let maxNodeCenterY = startY;
 
             for (let index = 0; index < steps.length; index += 1) {
                 const step = steps[index];
@@ -1036,11 +1048,13 @@
                     step,
                     x,
                     y,
+                    isLoopEnd: false,
                     descriptionLines,
                     descriptionTruncated: descriptionWrap.truncated,
                     height: NODE_BASE_HEIGHT + descriptionLineCount * NODE_DESC_LINE_HEIGHT,
                 };
                 nodes.push(node);
+                maxNodeCenterY = Math.max(maxNodeCenterY, y);
 
                 if (!firstRef) {
                     firstRef = ref;
@@ -1062,6 +1076,7 @@
                     if (populatedBranches.length) {
                         const branchStartY = y + LAYOUT.verticalGap;
                         const branchRefs = [];
+                        let branchMaxNodeY = y;
                         const preferredSide = {
                             OnFalse: -1,
                             OnTrue: 1,
@@ -1113,6 +1128,8 @@
                             const offset = reserveSlot(preferred);
                             const branchX = x + offset * LAYOUT.branchGap;
                             const branchLayout = layoutSequence(branch.steps, `${ref}.${branch.key}`, branchX, branchStartY);
+                            branchMaxNodeY = Math.max(branchMaxNodeY, branchLayout.maxNodeCenterY);
+                            maxNodeCenterY = Math.max(maxNodeCenterY, branchLayout.maxNodeCenterY);
 
                             if (branchLayout.firstRef) {
                                 edges.push({ sourceRef: ref, targetRef: branchLayout.firstRef, label: branch.key, kind: "branch" });
@@ -1123,10 +1140,28 @@
 
                         if (branchRefs.length) {
                             if (isLoopNode) {
-                                branchRefs.forEach((branchRef) => {
-                                    edges.push({ sourceRef: branchRef, targetRef: ref, label: "loop", kind: "loopback" });
+                                const endRef = `${ref}.__end`;
+                                const endY = branchMaxNodeY + LAYOUT.verticalGap;
+                                nodes.push({
+                                    ref: endRef,
+                                    step: null,
+                                    x,
+                                    y: endY,
+                                    isLoopEnd: true,
+                                    loopRef: ref,
+                                    loopStep: step,
+                                    descriptionLines: [],
+                                    descriptionTruncated: false,
+                                    height: LAYOUT.endNodeDiameter,
                                 });
-                                outgoingRefs = [ref];
+                                maxNodeCenterY = Math.max(maxNodeCenterY, endY);
+                                branchRefs.forEach((branchRef) => {
+                                    edges.push({ sourceRef: branchRef, targetRef: endRef, label: "", kind: "flow" });
+                                });
+                                edges.push({ sourceRef: ref, targetRef: endRef, label: "", kind: "branch" });
+                                edges.push({ sourceRef: endRef, targetRef: ref, label: "loop", kind: "loopback" });
+                                outgoingRefs = [endRef];
+                                y = endY + LAYOUT.verticalGap;
                             } else {
                                 // For timeout handling, preserve the straight-through request success path
                                 // and merge timeout branch endpoints back into downstream flow.
@@ -1136,12 +1171,36 @@
                                     outgoingRefs = branchRefs;
                                 }
                             }
-                            y = branchBottomY + LAYOUT.verticalGap;
+                            if (!isLoopNode) {
+                                y = branchBottomY + LAYOUT.verticalGap;
+                            }
                         } else {
                             y += LAYOUT.verticalGap;
                         }
                     } else {
-                        y += LAYOUT.verticalGap;
+                        if (isLoopNode) {
+                            const endRef = `${ref}.__end`;
+                            const endY = y + LAYOUT.verticalGap;
+                            nodes.push({
+                                ref: endRef,
+                                step: null,
+                                x,
+                                y: endY,
+                                isLoopEnd: true,
+                                loopRef: ref,
+                                loopStep: step,
+                                descriptionLines: [],
+                                descriptionTruncated: false,
+                                height: LAYOUT.endNodeDiameter,
+                            });
+                            maxNodeCenterY = Math.max(maxNodeCenterY, endY);
+                            edges.push({ sourceRef: ref, targetRef: endRef, label: "", kind: "branch" });
+                            edges.push({ sourceRef: endRef, targetRef: ref, label: "loop", kind: "loopback" });
+                            outgoingRefs = [endRef];
+                            y = endY + LAYOUT.verticalGap;
+                        } else {
+                            y += LAYOUT.verticalGap;
+                        }
                     }
                 } else {
                     y += LAYOUT.verticalGap;
@@ -1155,6 +1214,7 @@
                 firstRef,
                 lastRefs: incomingRefs,
                 maxY: maxYUsed,
+                maxNodeCenterY,
             };
         }
 
@@ -1218,6 +1278,10 @@
             .attr("width", LAYOUT.nodeWidth)
             .attr("x", -LAYOUT.nodeWidth / 2);
         nodeEnter
+            .append("circle")
+            .attr("class", "node-end-circle")
+            .attr("r", LAYOUT.endNodeDiameter / 2);
+        nodeEnter
             .append("text")
             .attr("x", -LAYOUT.nodeWidth / 2 + 12)
             .attr("class", "node-id");
@@ -1229,9 +1293,15 @@
             .append("text")
             .attr("x", -LAYOUT.nodeWidth / 2 + 12)
             .attr("class", "node-description");
+        nodeEnter
+            .append("text")
+            .attr("class", "node-end-label")
+            .attr("dy", 4)
+            .attr("text-anchor", "middle");
 
         const dragBehavior = d3
             .drag()
+            .filter((event, node) => !node.isLoopEnd)
             .on("start", function () {
                 hideTooltip();
                 d3.select(this).classed("dragging", true);
@@ -1252,18 +1322,24 @@
 
         nodeSel
             .merge(nodeEnter)
+            .classed("loop-end", (node) => Boolean(node.isLoopEnd))
             .classed("selected", (node) => node.ref === state.selectedStepRef)
             .attr("transform", (node) => `translate(${node.x},${node.y})`)
             .on("click", (event, node) => {
                 event.stopPropagation();
+                if (node.isLoopEnd) {
+                    return;
+                }
                 state.selectedStepRef = node.ref;
                 renderAll();
             })
             .on("mouseenter", (event, node) => {
-                scheduleTooltip(node.step.Type || "Step", event);
+                const tooltipType = node.isLoopEnd ? "Loop End" : (node.step.Type || "Step");
+                scheduleTooltip(tooltipType, event);
             })
             .on("mousemove", (event, node) => {
-                moveTooltip(node.step.Type || "Step", event);
+                const tooltipType = node.isLoopEnd ? "Loop End" : (node.step.Type || "Step");
+                moveTooltip(tooltipType, event);
             })
             .on("mouseleave", () => {
                 hideTooltip();
@@ -1273,20 +1349,26 @@
         nodeSel
             .merge(nodeEnter)
             .select("text.node-id")
-            .text((node) => node.step.ID)
+            .text((node) => (node.isLoopEnd ? "" : node.step.ID))
             .attr("y", (node) => -node.height / 2 + 17)
             .attr("font-weight", 700);
 
         nodeSel
             .merge(nodeEnter)
             .select("rect")
-            .attr("height", (node) => node.height)
-            .attr("y", (node) => -node.height / 2);
+            .attr("height", (node) => (node.isLoopEnd ? 0 : node.height))
+            .attr("y", (node) => (node.isLoopEnd ? 0 : -node.height / 2))
+            .style("display", (node) => (node.isLoopEnd ? "none" : null));
+
+        nodeSel
+            .merge(nodeEnter)
+            .select("circle.node-end-circle")
+            .style("display", (node) => (node.isLoopEnd ? null : "none"));
 
         nodeSel
             .merge(nodeEnter)
             .select("text.node-type")
-            .text((node) => node.step.Type || "Step")
+            .text((node) => (node.isLoopEnd ? "" : (node.step.Type || "Step")))
             .attr("y", (node) => -node.height / 2 + 35);
 
         nodeSel
@@ -1295,6 +1377,10 @@
             .each(function (node) {
                 const selection = d3.select(this);
                 selection.attr("y", -node.height / 2 + 53);
+                if (node.isLoopEnd) {
+                    selection.selectAll("tspan").remove();
+                    return;
+                }
                 const lines = node.descriptionLines || [];
                 selection.selectAll("tspan").remove();
 
@@ -1314,6 +1400,12 @@
                     trimSvgTspanToWidth(tspanNode, NODE_TEXT_WIDTH, needsEllipsis);
                 });
             });
+
+        nodeSel
+            .merge(nodeEnter)
+            .select("text.node-end-label")
+            .text((node) => (node.isLoopEnd ? "End" : ""))
+            .style("display", (node) => (node.isLoopEnd ? null : "none"));
 
         nodeSel.exit().remove();
         renderDropPreview();
