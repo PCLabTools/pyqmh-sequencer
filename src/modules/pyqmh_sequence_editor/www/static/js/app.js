@@ -875,8 +875,23 @@
         return true;
     }
 
-    function isStepArray(value) {
-        return Array.isArray(value) && value.every((item) => item && typeof item === "object" && typeof item.Type === "string");
+    function isStepLikeItem(item) {
+        return Boolean(item && typeof item === "object" && typeof item.Type === "string");
+    }
+
+    function isStepArrayField(key, value) {
+        if (!Array.isArray(value)) {
+            return false;
+        }
+
+        // Only known control-flow branch arrays should be treated as subsequences when empty.
+        const knownBranchFields = new Set(["SubSequence", "OnTrue", "OnFalse", "OnTimeout"]);
+        if (knownBranchFields.has(key)) {
+            return value.every((item) => isStepLikeItem(item));
+        }
+
+        // For any other array field, require at least one step-like entry to classify it as a subsequence.
+        return value.length > 0 && value.every((item) => isStepLikeItem(item));
     }
 
     function getSubsequenceFields(step) {
@@ -889,7 +904,7 @@
             if (key === "_ui") {
                 return;
             }
-            if (isStepArray(step[key])) {
+            if (isStepArrayField(key, step[key])) {
                 fields.push({ key, steps: step[key] });
             }
         });
@@ -1696,7 +1711,7 @@
 
         Object.keys(step)
             .filter((key) => !["ID", "Description", "Type", "_ui"].includes(key))
-            .filter((key) => !isStepArray(step[key]))
+            .filter((key) => !isStepArrayField(key, step[key]))
             .forEach((key) => {
                 if (key === "Module ID" && (step.Type === "Action" || step.Type === "Request")) {
                     buildModuleIdField(form, step);
