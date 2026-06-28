@@ -353,8 +353,129 @@ button.danger {
     max-width: 360px;
 }
 
-.toolbar-actions #save-path {
-    min-width: 260px;
+.toolbar-metadata-dropdown {
+    position: relative;
+}
+
+.toolbar-metadata-dropdown > summary {
+    list-style: none;
+    cursor: pointer;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 10px;
+    background: var(--bg-subtle);
+    color: var(--text);
+}
+
+.toolbar-metadata-dropdown > summary::-webkit-details-marker {
+    display: none;
+}
+
+.toolbar-metadata-dropdown[open] > summary {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.toolbar-metadata-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: min(540px, 82vw);
+    max-height: min(58vh, 420px);
+    overflow: auto;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-panel);
+    backdrop-filter: blur(12px);
+    box-shadow: var(--shadow-soft);
+    display: grid;
+    gap: 8px;
+    z-index: 90;
+}
+
+.metadata-list {
+    display: grid;
+    gap: 8px;
+}
+
+.metadata-row {
+    display: grid;
+    grid-template-columns: minmax(110px, 180px) 1fr auto;
+    gap: 8px;
+    align-items: center;
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--hover) 40%, transparent);
+    padding: 8px;
+}
+
+.metadata-name {
+    font-size: 0.77rem;
+    font-weight: 700;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.metadata-value-input {
+    min-width: 0;
+    font-size: 0.8rem;
+}
+
+.metadata-add-row {
+    margin-top: 2px;
+    margin-bottom: 0;
+}
+
+.metadata-add-row input {
+    min-width: 0;
+}
+
+.save-dialog {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--bg-panel);
+    color: var(--text);
+    padding: 0;
+    width: min(540px, 92vw);
+    box-shadow: var(--shadow-soft);
+}
+
+.save-dialog::backdrop {
+    background: rgba(4, 14, 24, 0.55);
+    backdrop-filter: blur(4px);
+}
+
+.save-dialog-form {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+}
+
+.save-dialog-form h2 {
+    font-size: 1rem;
+}
+
+.dialog-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.83rem;
+    color: var(--text-muted);
+}
+
+.dialog-checkbox input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    margin: 0;
+}
+
+.save-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 .canvas-wrap {
@@ -600,7 +721,7 @@ button.danger {
 
 .node-end-label {
     fill: var(--text);
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 700;
     font-family: "IBM Plex Mono", Consolas, monospace;
     pointer-events: none;
@@ -741,10 +862,24 @@ button.danger {
         flex-wrap: wrap;
     }
 
-    .toolbar-actions #file-select,
-    .toolbar-actions #save-path {
+    .toolbar-actions #file-select {
         min-width: 0;
         flex: 1 1 100%;
+    }
+
+    .toolbar-metadata-dropdown {
+        width: 100%;
+    }
+
+    .toolbar-metadata-dropdown > summary {
+        width: 100%;
+    }
+
+    .toolbar-metadata-panel {
+        width: 100%;
+        max-width: 100%;
+        position: static;
+        max-height: 260px;
     }
 
     .panel-tools,

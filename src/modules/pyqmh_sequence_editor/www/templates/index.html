@@ -50,11 +50,38 @@
             <select id="file-select" aria-label="Sequence file list"></select>
             <button id="btn-new" type="button">New</button>
             <button id="btn-load" type="button">Load</button>
+            <details class="toolbar-metadata-dropdown" id="metadata-details">
+                <summary>Metadata</summary>
+                <div class="toolbar-metadata-panel">
+                    <div id="metadata-list" class="metadata-list"></div>
+                    <div class="row-inline metadata-add-row">
+                        <input id="new-metadata-name" type="text" placeholder="metadata key" aria-label="Metadata key">
+                        <button id="btn-add-metadata" type="button">Add</button>
+                    </div>
+                </div>
+            </details>
             <button id="btn-save" type="button">Save</button>
-            <input id="save-path" type="text" placeholder="doc/example sequences/my_sequence.json" aria-label="Save path">
             <button id="btn-save-as" type="button">Save As</button>
         </div>
     </header>
+
+    <dialog id="save-dialog" class="save-dialog">
+        <form id="save-dialog-form" method="dialog" class="save-dialog-form">
+            <h2>Save Sequence</h2>
+            <div class="field-row">
+                <label for="save-dialog-path">Sequence Path</label>
+                <input id="save-dialog-path" type="text" placeholder="doc/example sequences/my_sequence.json" aria-label="Sequence path">
+            </div>
+            <label class="dialog-checkbox" for="save-dialog-auto-build">
+                <input id="save-dialog-auto-build" type="checkbox" checked>
+                Auto increment build
+            </label>
+            <div class="save-dialog-actions">
+                <button id="btn-save-dialog-cancel" type="button">Cancel</button>
+                <button id="btn-save-dialog-confirm" type="submit">Save</button>
+            </div>
+        </form>
+    </dialog>
 
     <aside class="panel panel-tools">
         <h2>Tools</h2>

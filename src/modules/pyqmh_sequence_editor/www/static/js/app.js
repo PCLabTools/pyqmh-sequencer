@@ -48,7 +48,7 @@
         nodeWidth: 190,
         nodeHeight: 92,
         startY: 130,
-        endNodeDiameter: 56,
+        endNodeDiameter: 42,
     };
     const NODE_DESCRIPTION_FONT = '10px "IBM Plex Mono", Consolas, monospace';
     const NODE_DESCRIPTION_MAX_LINES = 3;
@@ -76,6 +76,12 @@
     let tooltipPending = null;
     let tooltipAnchor = null;
 
+    const REQUIRED_METADATA_DEFAULTS = {
+        "sequence id": "untitled_sequence",
+        description: "Created in pyqmh sequence editor",
+        version: "1.0.0",
+    };
+
     function createEmptySequence() {
         return {
             metadata: {
@@ -97,6 +103,61 @@
 
     function deepClone(value) {
         return JSON.parse(JSON.stringify(value));
+    }
+
+    function ensureSequenceMetadata() {
+        if (!state.sequence || typeof state.sequence !== "object") {
+            state.sequence = createEmptySequence();
+        }
+        if (!state.sequence.metadata || typeof state.sequence.metadata !== "object" || Array.isArray(state.sequence.metadata)) {
+            state.sequence.metadata = {};
+        }
+
+        Object.entries(REQUIRED_METADATA_DEFAULTS).forEach(([key, fallback]) => {
+            const current = state.sequence.metadata[key];
+            if (current === undefined || current === null || String(current).trim() === "") {
+                state.sequence.metadata[key] = fallback;
+            }
+        });
+    }
+
+    function incrementVersionBuild(versionRaw) {
+        const version = String(versionRaw || "").trim();
+        if (!version) {
+            return "1.0.0.1";
+        }
+
+        const withBuildMeta = /^(.*\+)(\d+)$/.exec(version);
+        if (withBuildMeta) {
+            const next = Number(withBuildMeta[2]) + 1;
+            return `${withBuildMeta[1]}${next}`;
+        }
+
+        const numericDotVersion = /^(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?$/.exec(version);
+        if (numericDotVersion) {
+            const major = numericDotVersion[1];
+            const minor = numericDotVersion[2];
+            const patch = numericDotVersion[3];
+            const build = Number(numericDotVersion[4] || "0") + 1;
+            return `${major}.${minor}.${patch}.${build}`;
+        }
+
+        const trailingNumber = /^(.*?)(\d+)$/.exec(version);
+        if (trailingNumber) {
+            return `${trailingNumber[1]}${Number(trailingNumber[2]) + 1}`;
+        }
+
+        return `${version}.1`;
+    }
+
+    function applyAutoBuildIncrement(enabled) {
+        if (!enabled) {
+            return false;
+        }
+
+        ensureSequenceMetadata();
+        state.sequence.metadata.version = incrementVersionBuild(state.sequence.metadata.version);
+        return true;
     }
 
     function stripUiState(value) {
@@ -997,22 +1058,32 @@
         try {
             const payload = await apiRequest("load_sequence", { path });
             state.sequence = payload.sequence;
+            ensureSequenceMetadata();
             state.currentPath = payload.path;
             state.selectedStepRef = null;
             renderAll();
             setDirty(false);
-            document.getElementById("save-path").value = state.currentPath;
             setStatus(`Loaded ${state.currentPath}.`, false);
         } catch (error) {
             setStatus(error.message, true);
         }
     }
 
-    async function saveSequence(path, overwrite) {
+    async function saveSequence(path, overwrite, options) {
         const finalPath = String(path || "").trim();
         if (!finalPath) {
             setStatus("Provide a path before saving.", true);
-            return;
+            return false;
+        }
+
+        const settings = options && typeof options === "object" ? options : {};
+        ensureSequenceMetadata();
+        const shouldIncrementBuild = Object.prototype.hasOwnProperty.call(settings, "autoIncrementBuild")
+            ? Boolean(settings.autoIncrementBuild)
+            : true;
+        const didIncrementBuild = settings.skipBuildIncrement ? false : applyAutoBuildIncrement(shouldIncrementBuild);
+        if (didIncrementBuild) {
+            setDirty(true);
         }
 
         try {
@@ -1022,19 +1093,52 @@
                 overwrite: Boolean(overwrite),
             });
             state.currentPath = payload.path;
-            document.getElementById("save-path").value = state.currentPath;
             await refreshFileList();
             setDirty(false);
             setStatus(`Saved ${state.currentPath}.`, false);
+            return true;
         } catch (error) {
             if (String(error.message).toLowerCase().includes("already exists") && !overwrite) {
                 const doOverwrite = window.confirm("File exists. Overwrite it?");
                 if (doOverwrite) {
-                    await saveSequence(finalPath, true);
+                    return saveSequence(finalPath, true, { ...settings, skipBuildIncrement: true });
                 }
-                return;
+                return false;
             }
             setStatus(error.message, true);
+            return false;
+        }
+    }
+
+    function openSaveDialog(overwriteDefault) {
+        const dialog = document.getElementById("save-dialog");
+        const pathInput = document.getElementById("save-dialog-path");
+        const buildInput = document.getElementById("save-dialog-auto-build");
+        if (!dialog || !pathInput || !buildInput) {
+            return;
+        }
+
+        dialog.dataset.overwrite = overwriteDefault ? "true" : "false";
+        pathInput.value = state.currentPath || "";
+        buildInput.checked = true;
+
+        if (typeof dialog.showModal === "function") {
+            dialog.showModal();
+        } else {
+            dialog.setAttribute("open", "open");
+        }
+    }
+
+    function closeSaveDialog() {
+        const dialog = document.getElementById("save-dialog");
+        if (!dialog) {
+            return;
+        }
+
+        if (typeof dialog.close === "function") {
+            dialog.close();
+        } else {
+            dialog.removeAttribute("open");
         }
     }
 
@@ -1796,6 +1900,57 @@
         });
     }
 
+    function renderMetadata() {
+        ensureSequenceMetadata();
+
+        const list = document.getElementById("metadata-list");
+        if (!list) {
+            return;
+        }
+        list.innerHTML = "";
+
+        const entries = Object.entries(state.sequence.metadata || {});
+        entries.forEach(([name, value]) => {
+            const row = document.createElement("div");
+            row.className = "metadata-row";
+
+            const nameEl = document.createElement("div");
+            nameEl.className = "metadata-name";
+            nameEl.textContent = name;
+
+            const valueInput = document.createElement("input");
+            valueInput.className = "metadata-value-input";
+            valueInput.type = "text";
+            valueInput.value = String(value ?? "");
+            valueInput.addEventListener("change", function () {
+                state.sequence.metadata[name] = String(valueInput.value ?? "");
+                ensureSequenceMetadata();
+                setDirty(true);
+                renderAll();
+            });
+
+            const removeBtn = document.createElement("button");
+            removeBtn.type = "button";
+            removeBtn.textContent = "x";
+
+            if (Object.prototype.hasOwnProperty.call(REQUIRED_METADATA_DEFAULTS, name)) {
+                removeBtn.disabled = true;
+                removeBtn.title = "Required metadata cannot be removed.";
+            } else {
+                removeBtn.addEventListener("click", function () {
+                    delete state.sequence.metadata[name];
+                    setDirty(true);
+                    renderAll();
+                });
+            }
+
+            row.appendChild(nameEl);
+            row.appendChild(valueInput);
+            row.appendChild(removeBtn);
+            list.appendChild(row);
+        });
+    }
+
     function renderToolPanel() {
         const toolList = document.getElementById("tool-list");
         toolList.innerHTML = "";
@@ -1910,9 +2065,11 @@
     }
 
     function renderAll() {
+        ensureSequenceMetadata();
         renderCanvas();
         renderStepForm();
         renderVariables();
+        renderMetadata();
     }
 
     function bindControls() {
@@ -1924,22 +2081,57 @@
 
         document.getElementById("btn-new").addEventListener("click", function () {
             state.sequence = createEmptySequence();
+            ensureSequenceMetadata();
             state.selectedStepRef = null;
             state.currentPath = "";
-            document.getElementById("save-path").value = "";
             renderAll();
             setDirty(false);
             setStatus("Created new sequence.", false);
         });
 
         document.getElementById("btn-save").addEventListener("click", function () {
-            const savePath = state.currentPath || document.getElementById("save-path").value;
-            saveSequence(savePath, true);
+            openSaveDialog(true);
         });
 
         document.getElementById("btn-save-as").addEventListener("click", function () {
-            const savePath = document.getElementById("save-path").value;
-            saveSequence(savePath, false);
+            openSaveDialog(false);
+        });
+
+        const saveDialogForm = document.getElementById("save-dialog-form");
+        const saveDialogCancel = document.getElementById("btn-save-dialog-cancel");
+        const saveDialog = document.getElementById("save-dialog");
+        saveDialogForm.addEventListener("submit", async function (event) {
+            event.preventDefault();
+            const pathInput = document.getElementById("save-dialog-path");
+            const buildInput = document.getElementById("save-dialog-auto-build");
+            const overwrite = saveDialog && saveDialog.dataset.overwrite === "true";
+            const savePath = pathInput ? pathInput.value : "";
+            const saved = await saveSequence(savePath, overwrite, { autoIncrementBuild: buildInput && buildInput.checked });
+            if (saved) {
+                closeSaveDialog();
+            }
+        });
+
+        saveDialogCancel.addEventListener("click", function () {
+            closeSaveDialog();
+        });
+
+        document.getElementById("btn-add-metadata").addEventListener("click", function () {
+            const input = document.getElementById("new-metadata-name");
+            const rawName = String(input.value || "").trim();
+            if (!rawName) {
+                setStatus("Metadata key cannot be empty.", true);
+                return;
+            }
+            if (Object.prototype.hasOwnProperty.call(state.sequence.metadata, rawName)) {
+                setStatus("Metadata key already exists.", true);
+                return;
+            }
+
+            state.sequence.metadata[rawName] = "";
+            input.value = "";
+            setDirty(true);
+            renderAll();
         });
 
         document.getElementById("btn-delete-step").addEventListener("click", function () {
@@ -1971,6 +2163,7 @@
     }
 
     async function bootstrap() {
+        ensureSequenceMetadata();
         renderToolPanel();
         setupCanvas();
         bindControls();
