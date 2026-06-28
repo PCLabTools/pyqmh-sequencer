@@ -310,9 +310,7 @@ body.no-nav #main-content {
     flex-wrap: nowrap;
     flex: 1 1 auto;
     min-width: 0;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: thin;
+    overflow: visible;
 }
 
 .toolbar-actions > * {
@@ -355,6 +353,7 @@ button.danger {
 
 .toolbar-metadata-dropdown {
     position: relative;
+    margin-left: 0;
 }
 
 .toolbar-metadata-dropdown > summary {
@@ -379,17 +378,20 @@ button.danger {
 .toolbar-metadata-panel {
     position: absolute;
     top: calc(100% + 8px);
-    left: 0;
-    width: min(540px, 82vw);
-    max-height: min(58vh, 420px);
-    overflow: auto;
+    right: 0;
+    width: min(760px, 86vw);
+    min-width: 560px;
+    max-height: min(58vh, 460px);
+    overflow: hidden;
+    margin-top: 0;
     padding: 10px;
     border: 1px solid var(--border);
     border-radius: 12px;
     background: var(--bg-panel);
     backdrop-filter: blur(12px);
     box-shadow: var(--shadow-soft);
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 8px;
     z-index: 90;
 }
@@ -397,11 +399,15 @@ button.danger {
 .metadata-list {
     display: grid;
     gap: 8px;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 2px;
 }
 
 .metadata-row {
     display: grid;
-    grid-template-columns: minmax(110px, 180px) 1fr auto;
+    grid-template-columns: minmax(130px, 200px) minmax(260px, 1fr) auto;
     gap: 8px;
     align-items: center;
     border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
@@ -420,6 +426,7 @@ button.danger {
 }
 
 .metadata-value-input {
+    width: 100%;
     min-width: 0;
     font-size: 0.8rem;
 }
